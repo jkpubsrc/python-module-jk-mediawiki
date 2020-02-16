@@ -3,7 +3,7 @@
 	"name": "jk_mediawiki",
 	"version": "0.2020.2.16",
 	"meta": {
-		"description": "This module collects source code used for assistance in working with MediaWiki",
+		"description": "This module provides functions, classes and binaries to assist in working with MediaWiki installations.",
 		"keywords": [
 			"mediawiki",
 			"mw",

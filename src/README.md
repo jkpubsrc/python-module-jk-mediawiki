@@ -4,8 +4,7 @@
 Introduction
 ------------
 
-This python module collects pieces of source code used for assistance in working with MediaWiki. Currently this assistance is quite limited, consider it
-as still being rudimentary: Only parsing and minor changes to LocalSettings.php is supported right now.
+This module provides functions, classes and binaries to assist in working with MediaWiki installations.
 
 Information about this module can be found here:
 
