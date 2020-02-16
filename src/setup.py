@@ -22,7 +22,7 @@ setup(
 		"Development Status :: 4 - Beta",
 		"License :: OSI Approved :: Apache Software License",
 	],
-	description = "This module collects source code used for assistance in working with MediaWiki",
+	description = "This module provides functions, classes and binaries to assist in working with MediaWiki installations.",
 	download_url = "https://github.com/jkpubsrc/python-module-jk-mediawiki/tarball/0.2020.2.16",
 	include_package_data = False,
 	install_requires = [
