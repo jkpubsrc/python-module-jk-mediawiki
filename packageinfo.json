@@ -1,0 +1,63 @@
+{
+	"language": "python3",
+	"name": "jk_mediawiki",
+	"version": "0.2020.2.16",
+	"meta": {
+		"description": "This module collects source code used for assistance in working with MediaWiki",
+		"keywords": [
+			"mediawiki",
+			"mw",
+			"php"
+		],
+		"license": "Apache 2.0",
+		"development_status": "beta",
+		"authors": [
+			{
+				"name": "Jürgen Knauth",
+				"email": "pubsrc@binary-overflow.de"
+			}
+		],
+		"wiki": {
+			"page": "DevDocs:jk_mediawiki"
+		}
+	},
+	"repositories": [
+		{
+			"type": "github",
+			"user": "jkpubsrc",
+			"project": "python-module-jk-mediawiki",
+			"devon_publish": true
+		},
+		{
+			"type": "pypy",
+			"project": "jk_mediawiki",
+			"devon_publish": true
+		}
+	],
+	"source": {
+		"packages": [
+			"jk_mediawiki"
+		],
+		"extra_data_files": [
+		],
+		"extra_binary_files": [
+			"bin/wikilocalctrl.py"
+		]
+	},
+	"requirements": {
+		"python_packages": [
+			"jk_utils",
+			"jk_console"
+		],
+		"python_packages_dev": [
+			"jk_typing",
+			"jk_logging",
+			"jk_argparsing",
+			"jk_pwdinput",
+			"jk_json",
+			"jk_testing",
+			"jk_sysinfo"
+		]
+	}
+}
+
