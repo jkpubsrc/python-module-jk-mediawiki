@@ -51,12 +51,13 @@ ap.createReturnCode(1, "An error occurred.")
 
 ap.createCommand("scan", "Scan all projects.")
 ap.createCommand("help", "Display this help text.")
-ap.createCommand("status", "List existing local Wikis and their status.")
+ap.createCommand("wikilist", "List existing local Wikis and their status.")
 ap.createCommand("httpstart", "Start the HTTP service(s).")
 ap.createCommand("httpstop", "Stop the HTTP service(s).")
 ap.createCommand("httpstatus", "Status about the HTTP service(s).")
-ap.createCommand("stop", "Stop a Wiki service.").expectString("wikiName", minLength=1)
-ap.createCommand("start", "Start a Wiki service.").expectString("wikiName", minLength=1)
+ap.createCommand("wikistop", "Stop a Wiki service.").expectString("wikiName", minLength=1)
+ap.createCommand("wikistart", "Start a Wiki service.").expectString("wikiName", minLength=1)
+ap.createCommand("status", "List full status of HTTP service(s) and local Wikis.")
 
 
 
@@ -107,6 +108,61 @@ def listWikis(cfg:dict):
 			ret.append(candidate)
 	return cfg["wwwWikiRootDir"], ret
 #
+
+
+
+def cmd_httpstatus(cfg:dict, log):
+	startNGINXScriptPath, startPHPFPMScriptPath = getHttpdCfg(cfg)
+	h = jk_mediawiki.MediaWikiLocalUserServiceMgr(startNGINXScriptPath, startPHPFPMScriptPath, userName)
+
+	t = jk_console.SimpleTable()
+	t.addRow("Service", "Status", "Main Process(es)").hlineAfterRow = True
+	r = jk_console.Console.RESET
+
+	nginxPIDs = h.getNGINXMasterProcesses()
+	c = jk_console.Console.ForeGround.STD_GREEN if nginxPIDs else jk_console.Console.ForeGround.STD_DARKGRAY
+	if nginxPIDs:
+		t.addRow("Local NGINX", "running", str([ x["pid"] for x in nginxPIDs ])).color = c
+	else:
+		t.addRow("Local NGINX", "stopped", "-").color = c
+
+	phpPIDs = h.getPHPFPMMasterProcesses()
+	c = jk_console.Console.ForeGround.STD_GREEN if phpPIDs else jk_console.Console.ForeGround.STD_DARKGRAY
+	if phpPIDs:
+		t.addRow("Local PHP-FPM", "running", str([ x["pid"] for x in phpPIDs ])).color = c
+	else:
+		t.addRow("Local PHP-FPM", "stopped", "-").color = c
+
+	print()
+	t.print()
+#
+
+
+
+def cmd_wikistatus(cfg:dict, log):
+	wwwWikiRootDir, wikis = listWikis(cfg)
+
+	t = jk_console.SimpleTable()
+	t.addRow("Wiki", "Version", "Status", "Cron Script Processes").hlineAfterRow = True
+	r = jk_console.Console.RESET
+
+	for wiki in wikis:
+		h = jk_mediawiki.MediaWikiLocalUserInstallationMgr(os.path.join(wwwWikiRootDir, wiki), userName)
+		bIsRunning = h.isCronScriptRunning()
+		c = jk_console.Console.ForeGround.STD_GREEN if bIsRunning else jk_console.Console.ForeGround.STD_DARKGRAY
+		t.addRow(
+			wiki,
+			str(h.getVersion()),
+			"running" if bIsRunning else "stopped",
+			str([ x["pid"] for x in h.getCronProcesses() ]) if bIsRunning else "-",
+			).color = c
+
+	print()
+	t.print()
+#
+
+
+
 
 
 
@@ -171,31 +227,8 @@ try:
 	# ----------------------------------------------------------------
 
 	elif cmdName == "httpstatus":
-		startNGINXScriptPath, startPHPFPMScriptPath = getHttpdCfg(cfg)
-		h = jk_mediawiki.MediaWikiLocalUserServiceMgr(startNGINXScriptPath, startPHPFPMScriptPath, userName)
-
-		t = jk_console.SimpleTable()
-		t.addRow("Service", "Status", "Main Process(es)").hlineAfterRow = True
-		r = jk_console.Console.RESET
-
-		nginxPIDs = h.getNGINXMasterProcesses()
-		c = jk_console.Console.ForeGround.STD_GREEN if nginxPIDs else jk_console.Console.ForeGround.STD_DARKGRAY
-		if nginxPIDs:
-			t.addRow("Local NGINX", "running", str([ x["pid"] for x in nginxPIDs ])).color = c
-		else:
-			t.addRow("Local NGINX", "stopped", "-").color = c
-
-		phpPIDs = h.getPHPFPMMasterProcesses()
-		c = jk_console.Console.ForeGround.STD_GREEN if phpPIDs else jk_console.Console.ForeGround.STD_DARKGRAY
-		if phpPIDs:
-			t.addRow("Local PHP-FPM", "running", str([ x["pid"] for x in phpPIDs ])).color = c
-		else:
-			t.addRow("Local PHP-FPM", "stopped", "-").color = c
-
+		cmd_httpstatus(cfg, log)
 		print()
-		t.print()
-		print()
-
 		sys.exit(0)
 
 	# ----------------------------------------------------------------
@@ -242,28 +275,14 @@ try:
 
 	# ----------------------------------------------------------------
 
-	elif cmdName == "status":
-		wwwWikiRootDir, wikis = listWikis(cfg)
-		t = jk_console.SimpleTable()
-		t.addRow("Wiki", "Version", "Status", "Cron Script Processes").hlineAfterRow = True
-		r = jk_console.Console.RESET
-		for wiki in wikis:
-			h = jk_mediawiki.MediaWikiLocalUserInstallationMgr(os.path.join(wwwWikiRootDir, wiki), userName)
-			bIsRunning = h.isCronScriptRunning()
-			c = jk_console.Console.ForeGround.STD_GREEN if bIsRunning else jk_console.Console.ForeGround.STD_DARKGRAY
-			t.addRow(
-				wiki,
-				str(h.getVersion()),
-				"running" if bIsRunning else "stopped",
-				str([ x["pid"] for x in h.getCronProcesses() ]) if bIsRunning else "-",
-				).color = c
+	elif cmdName == "wikistatus":
+		cmd_wikistatus(cfg, log)
 		print()
-		t.print()
-		print()
+		sys.exit(0)
 
 	# ----------------------------------------------------------------
 
-	elif cmdName == "stop":
+	elif cmdName == "wikistop":
 		wwwWikiRootDir, wikis = listWikis(cfg)
 		wiki = cmdArgs[0]
 		if wiki in wikis:
@@ -281,7 +300,7 @@ try:
 
 	# ----------------------------------------------------------------
 
-	elif cmdName == "start":
+	elif cmdName == "wikistart":
 		wwwWikiRootDir, wikis = listWikis(cfg)
 		wiki = cmdArgs[0]
 		if wiki in wikis:
@@ -297,6 +316,14 @@ try:
 
 		else:
 			raise Exception("No such Wiki: \"" + wiki + "\"")
+
+	# ----------------------------------------------------------------
+
+	elif cmdName == "status":
+		cmd_httpstatus(cfg, log)
+		cmd_wikistatus(cfg, log)
+		print()
+		sys.exit(0)
 
 	# ----------------------------------------------------------------
 
