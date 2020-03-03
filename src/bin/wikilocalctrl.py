@@ -189,7 +189,7 @@ try:
 	parsedArgs = ap.parse()
 
 	if parsedArgs.optionData["bShowVersion"]:
-		print(__version__)
+		print(jk_mediawiki.__version__)
 		sys.exit(1)
 
 	if parsedArgs.optionData["bShowHelp"]:

@@ -1,7 +1,7 @@
 {
 	"language": "python3",
 	"name": "jk_mediawiki",
-	"version": "0.2020.3.3",
+	"version": "0.2020.3.3.1",
 	"meta": {
 		"description": "This module provides functions, classes and binaries to assist in working with MediaWiki installations.",
 		"keywords": [
