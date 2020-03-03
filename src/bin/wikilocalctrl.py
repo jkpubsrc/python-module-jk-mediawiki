@@ -4,6 +4,7 @@ import time
 import os
 import getpass
 import sys
+import typing
 
 import jk_argparsing
 import jk_json
@@ -58,6 +59,8 @@ ap.createCommand("wikistatus", "List existing local Wikis and their status.")
 ap.createCommand("wikistop", "Stop a Wiki service.").expectString("wikiName", minLength=1)
 ap.createCommand("wikistart", "Start a Wiki service.").expectString("wikiName", minLength=1)
 ap.createCommand("status", "List full status of HTTP service(s) and local Wikis.")
+ap.createCommand("start", "Start relevant service(s) to run a specific wiki.").expectString("wikiName", minLength=1)
+ap.createCommand("stop", "Stop relevant service(s) to terminate a specific wiki.").expectString("wikiName", minLength=1)
 
 
 
@@ -89,7 +92,13 @@ def waitForService(fnGetPIDInfos, name:str, log:jk_logging.AbstractLogger):
 			raise Exception("Failed to start " + name + "!")
 #
 
-def listWikis(cfg:dict):
+#
+# Get a list of all existing Wikis (= running and not running).
+#
+# @return		str wwwWikiRootDir		The root directory for all local wikis
+# @return		str[] wikiName			The names of the wikis available.
+#
+def listWikis(cfg:dict) -> typing.Tuple[str,typing.List[str]]:
 	if cfg["wwwWikiRootDir"] is None:
 		raise Exception("Missing configuration: 'wwwWikiRootDir'")
 	if not os.path.isdir(cfg["wwwWikiRootDir"]):
@@ -285,37 +294,124 @@ try:
 	elif cmdName == "wikistop":
 		wwwWikiRootDir, wikis = listWikis(cfg)
 		wiki = cmdArgs[0]
-		if wiki in wikis:
-			h = jk_mediawiki.MediaWikiLocalUserInstallationMgr(os.path.join(wwwWikiRootDir, wiki), userName)
-			bIsRunning = h.isCronScriptRunning()
-
-			pidInfos = h.getCronProcesses()
-			if pidInfos:
-				h.stopCronScript(log.descend(wiki + ": Stopping ..."))
-			else:
-				log.notice(wiki + ": Already stopped")
-
-		else:
+		if wiki not in wikis:
 			raise Exception("No such Wiki: \"" + wiki + "\"")
+
+		# ----
+
+		h = jk_mediawiki.MediaWikiLocalUserInstallationMgr(os.path.join(wwwWikiRootDir, wiki), userName)
+		bIsRunning = h.isCronScriptRunning()
+
+		pidInfos = h.getCronProcesses()
+		if pidInfos:
+			h.stopCronScript(log.descend(wiki + ": Stopping ..."))
+		else:
+			log.notice(wiki + ": Already stopped")
 
 	# ----------------------------------------------------------------
 
 	elif cmdName == "wikistart":
 		wwwWikiRootDir, wikis = listWikis(cfg)
 		wiki = cmdArgs[0]
-		if wiki in wikis:
-			h = jk_mediawiki.MediaWikiLocalUserInstallationMgr(os.path.join(wwwWikiRootDir, wiki), userName)
-			bIsRunning = h.isCronScriptRunning()
-
-			pidInfos = h.getCronProcesses()
-			if pidInfos:
-				log.notice(wiki + ": Already running")
-			else:
-				h.startCronScript(log.descend(wiki + ": Starting ..."))
-				waitForService(h.getCronProcesses, wiki, log)
-
-		else:
+		if wiki not in wikis:
 			raise Exception("No such Wiki: \"" + wiki + "\"")
+
+		# ----
+
+		h = jk_mediawiki.MediaWikiLocalUserInstallationMgr(os.path.join(wwwWikiRootDir, wiki), userName)
+
+		pidInfos = h.getCronProcesses()
+		if pidInfos:
+			log.notice(wiki + ": Already running")
+		else:
+			h.startCronScript(log.descend(wiki + ": Starting ..."))
+			waitForService(h.getCronProcesses, wiki, log)
+
+	# ----------------------------------------------------------------
+
+	elif cmdName == "start":
+		wwwWikiRootDir, wikis = listWikis(cfg)
+		wiki = cmdArgs[0]
+		if wiki not in wikis:
+			raise Exception("No such Wiki: \"" + wiki + "\"")
+
+		startNGINXScriptPath, startPHPFPMScriptPath = getHttpdCfg(cfg)
+		h = jk_mediawiki.MediaWikiLocalUserServiceMgr(startNGINXScriptPath, startPHPFPMScriptPath, userName)
+
+		# ----
+
+		nginxPIDs = h.getNGINXMasterProcesses()
+		if nginxPIDs:
+			log.notice("Local NGINX: Already running")
+		else:
+			h.startNGINX(log.descend("Local NGINX: Starting ..."))
+			waitForService(h.getNGINXMasterProcesses, "NGINX", log)
+
+		phpPIDs = h.getPHPFPMMasterProcesses()
+		if phpPIDs:
+			log.notice("Local PHP-FPM: Already running")
+		else:
+			h.startPHPFPM(log.descend("Local PHP-FPM: Starting ..."))
+			waitForService(h.getPHPFPMMasterProcesses, "PHP-FPM", log)
+
+		# ----
+
+		h = jk_mediawiki.MediaWikiLocalUserInstallationMgr(os.path.join(wwwWikiRootDir, wiki), userName)
+
+		pidInfos = h.getCronProcesses()
+		if pidInfos:
+			log.notice(wiki + ": Already running")
+		else:
+			h.startCronScript(log.descend(wiki + ": Starting ..."))
+			waitForService(h.getCronProcesses, wiki, log)
+
+	# ----------------------------------------------------------------
+
+	elif cmdName == "stop":
+		wwwWikiRootDir, wikis = listWikis(cfg)
+		wiki = cmdArgs[0]
+		if wiki not in wikis:
+			raise Exception("No such Wiki: \"" + wiki + "\"")
+
+		startNGINXScriptPath, startPHPFPMScriptPath = getHttpdCfg(cfg)
+		h = jk_mediawiki.MediaWikiLocalUserServiceMgr(startNGINXScriptPath, startPHPFPMScriptPath, userName)
+
+		# ----
+
+		h = jk_mediawiki.MediaWikiLocalUserInstallationMgr(os.path.join(wwwWikiRootDir, wiki), userName)
+
+		pidInfos = h.getCronProcesses()
+		if pidInfos:
+			h.stopCronScript(log.descend(wiki + ": Stopping ..."))
+		else:
+			log.notice(wiki + ": Already stopped")
+
+		# ----
+
+		allRunningWikis = []
+		for wikiToCheck in wikis:
+			if wikiToCheck != wiki:
+				h = jk_mediawiki.MediaWikiLocalUserInstallationMgr(os.path.join(wwwWikiRootDir, wiki), userName)
+				pidInfos = h.getCronProcesses()
+				if pidInfos:
+					allRunningWikis.append(wikiToCheck)
+
+		if not allRunningWikis:
+			# no more wikis are running
+
+			log.notice("No more Wikis are running => NGINX and PHP no longer needed")
+
+			nginxPIDs = h.getNGINXMasterProcesses()
+			if nginxPIDs:
+				h.stopNGINX(log.descend("Local NGINX: Stopping ..."))
+			else:
+				log.notice("Local PHP-FPM: Already stopped")
+
+			phpPIDs = h.getPHPFPMMasterProcesses()
+			if phpPIDs:
+				h.stopPHPFPM(log.descend("Local PHP-FPM: Stopping ..."))
+			else:
+				log.notice("Local NGINX: Already stopped")
 
 	# ----------------------------------------------------------------
 
