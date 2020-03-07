@@ -401,6 +401,8 @@ try:
 
 			log.notice("No more Wikis are running => NGINX and PHP no longer needed")
 
+			h = jk_mediawiki.MediaWikiLocalUserServiceMgr(startNGINXScriptPath, startPHPFPMScriptPath, userName)
+
 			nginxPIDs = h.getNGINXMasterProcesses()
 			if nginxPIDs:
 				h.stopNGINX(log.descend("Local NGINX: Stopping ..."))
