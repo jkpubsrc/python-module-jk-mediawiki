@@ -1,7 +1,7 @@
 ﻿
 
 
-__version__ = "0.2020.3.7"
+__version__ = "0.2020.6.8"
 
 
 
@@ -11,4 +11,3 @@ from .MediaWikiLocalSettingsFile import MediaWikiLocalSettingsFile
 
 from .MediaWikiLocalUserServiceMgr import MediaWikiLocalUserServiceMgr
 from .MediaWikiLocalUserInstallationMgr import MediaWikiLocalUserInstallationMgr
-

@@ -55,6 +55,7 @@ ap.createCommand("help", "Display this help text.")
 ap.createCommand("httpstart", "Start the HTTP service(s).")
 ap.createCommand("httpstop", "Stop the HTTP service(s).")
 ap.createCommand("httpstatus", "Status about the HTTP service(s).")
+ap.createCommand("httprestart", "Restart the HTTP service(s).")
 ap.createCommand("wikistatus", "List existing local Wikis and their status.")
 ap.createCommand("wikistop", "Stop a Wiki service.").expectString("wikiName", minLength=1)
 ap.createCommand("wikistart", "Start a Wiki service.").expectString("wikiName", minLength=1)
@@ -152,16 +153,18 @@ def cmd_wikistatus(cfg:dict, log):
 	wwwWikiRootDir, wikis = listWikis(cfg)
 
 	t = jk_console.SimpleTable()
-	t.addRow("Wiki", "Version", "Status", "Cron Script Processes").hlineAfterRow = True
+	t.addRow("Wiki", "MW Version", "SMW Version", "Status", "Cron Script Processes").hlineAfterRow = True
 	r = jk_console.Console.RESET
 
 	for wiki in wikis:
 		h = jk_mediawiki.MediaWikiLocalUserInstallationMgr(os.path.join(wwwWikiRootDir, wiki), userName)
 		bIsRunning = h.isCronScriptRunning()
 		c = jk_console.Console.ForeGround.STD_GREEN if bIsRunning else jk_console.Console.ForeGround.STD_DARKGRAY
+		smVersion = h.getSMWVersion()
 		t.addRow(
 			wiki,
 			str(h.getVersion()),
+			str(smVersion) if smVersion else "-",
 			"running" if bIsRunning else "stopped",
 			str([ x["pid"] for x in h.getCronProcesses() ]) if bIsRunning else "-",
 			).color = c
@@ -250,13 +253,13 @@ try:
 		if nginxPIDs:
 			h.stopNGINX(log.descend("Local NGINX: Stopping ..."))
 		else:
-			log.notice("Local PHP-FPM: Already stopped")
+			log.notice("Local NGINX: Already stopped")
 
 		phpPIDs = h.getPHPFPMMasterProcesses()
 		if phpPIDs:
 			h.stopPHPFPM(log.descend("Local PHP-FPM: Stopping ..."))
 		else:
-			log.notice("Local NGINX: Already stopped")
+			log.notice("Local PHP-FPM: Already stopped")
 
 		sys.exit(0)
 
@@ -279,6 +282,48 @@ try:
 		else:
 			h.startPHPFPM(log.descend("Local PHP-FPM: Starting ..."))
 			waitForService(h.getPHPFPMMasterProcesses, "PHP-FPM", log)
+
+		sys.exit(0)
+
+	# ----------------------------------------------------------------
+
+	elif cmdName == "httprestart":
+		startNGINXScriptPath, startPHPFPMScriptPath = getHttpdCfg(cfg)
+		h = jk_mediawiki.MediaWikiLocalUserServiceMgr(startNGINXScriptPath, startPHPFPMScriptPath, userName)
+
+		nginxPIDs = h.getNGINXMasterProcesses()
+		if nginxPIDs:
+			h.stopNGINX(log.descend("Local NGINX: Stopping ..."))
+		else:
+			log.notice("Local NGINX: Not running")
+
+		phpPIDs = h.getPHPFPMMasterProcesses()
+		if phpPIDs:
+			h.stopPHPFPM(log.descend("Local PHP-FPM: Stopping ..."))
+		else:
+			log.notice("Local PHP-FPM: Not running")
+
+		phpPIDs = h.getNGINXMasterProcesses()
+		if phpPIDs:
+			while True:
+				time.sleep(0.5)
+				nginxPIDs = h.getNGINXMasterProcesses()
+				if not nginxPIDs:
+					break
+
+		phpPIDs = h.getPHPFPMMasterProcesses()
+		if phpPIDs:
+			while True:
+				time.sleep(0.5)
+				phpPIDs = h.getPHPFPMMasterProcesses()
+				if not phpPIDs:
+					break
+
+		h.startNGINX(log.descend("Local NGINX: Starting ..."))
+		waitForService(h.getNGINXMasterProcesses, "NGINX", log)
+
+		h.startPHPFPM(log.descend("Local PHP-FPM: Starting ..."))
+		waitForService(h.getPHPFPMMasterProcesses, "PHP-FPM", log)
 
 		sys.exit(0)
 

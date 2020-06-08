@@ -217,12 +217,20 @@ class MediaWikiLocalUserInstallationMgr(object):
 		return ret
 	#
 
-	def getVersion(self):
+	def getVersion(self) -> jk_version.Version:
 		lookingForFilePrefix = "RELEASE-NOTES-"
 		for entry in os.scandir(self.__wikiDirPath):
 			if entry.is_file() and entry.name.startswith(lookingForFilePrefix):
 				return jk_version.Version(entry.name[len(lookingForFilePrefix):])
 		raise Exception("Can't determine version!")
+	#
+
+	def getSMWVersion(self) -> jk_version.Version:
+		p = os.path.join(self.__wikiDirPath, "extensions", "SemanticMediaWiki", "extension.json")
+		if os.path.isfile(p):
+			j = jk_json.loadFromFile(p)
+			return jk_version.Version(j["version"])
+		return None
 	#
 
 #
