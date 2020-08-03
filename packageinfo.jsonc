@@ -1,0 +1,67 @@
+{
+	"documentation": [],
+	"magic": {
+		"magic": "packageinfo",
+		"version": 2
+	},
+	"meta": {
+		"authors": [
+			{
+				"email": "pubsrc@binary-overflow.de",
+				"name": "J\u00fcrgen Knauth"
+			}
+		],
+		"description": "This module provides functions, classes and binaries to assist in working with MediaWiki installations.",
+		"development_status": "beta",
+		"keywords": [
+			"mediawiki",
+			"mw",
+			"php"
+		],
+		"language": "python3",
+		"license": "Apache2",
+		"name": "jk_mediawiki",
+		"packageClass": "python-module",
+		"version": "0.2020.8.3"
+	},
+	"repositories": [
+		{
+			"devon_publish": true,
+			"project": "python-module-jk-mediawiki",
+			"type": "github",
+			"user": "jkpubsrc"
+		},
+		{
+			"devon_publish": true,
+			"project": "jk_mediawiki",
+			"type": "pypi"
+		}
+	],
+	"requirements": {
+		"python_packages": [
+			"jk_utils",
+			"jk_console"
+		],
+		"python_packages_dev": [
+			"jk_typing",
+			"jk_logging",
+			"jk_argparsing",
+			"jk_pwdinput",
+			"jk_json",
+			"jk_testing",
+			"jk_sysinfo",
+			"jk_mounting",
+			"jk_sysinfo"
+		],
+		"system_apt_packages": []
+	},
+	"source": {
+		"extra_binary_files": [
+			"bin/wikilocalctrl.py"
+		],
+		"extra_data_files": [],
+		"packages": [
+			"jk_mediawiki"
+		]
+	}
+}

@@ -11,3 +11,8 @@ from .MediaWikiLocalSettingsFile import MediaWikiLocalSettingsFile
 
 from .MediaWikiLocalUserServiceMgr import MediaWikiLocalUserServiceMgr
 from .MediaWikiLocalUserInstallationMgr import MediaWikiLocalUserInstallationMgr
+from .MediaWikiDiskUsageInfo import MediaWikiDiskUsageInfo
+
+
+
+

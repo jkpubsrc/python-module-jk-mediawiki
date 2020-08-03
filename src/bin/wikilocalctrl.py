@@ -12,6 +12,8 @@ import jk_mediawiki
 import jk_logging
 import jk_typing
 import jk_console
+import jk_mounting
+import jk_sysinfo
 
 
 
@@ -50,7 +52,7 @@ ap.createReturnCode(1, "An error occurred.")
 
 # commands
 
-ap.createCommand("scan", "Scan all projects.")
+ap.createCommand("df", "Show only disk usage information.")
 ap.createCommand("help", "Display this help text.")
 ap.createCommand("httpstart", "Start the HTTP service(s).")
 ap.createCommand("httpstop", "Stop the HTTP service(s).")
@@ -59,13 +61,17 @@ ap.createCommand("httprestart", "Restart the HTTP service(s).")
 ap.createCommand("wikistatus", "List existing local Wikis and their status.")
 ap.createCommand("wikistop", "Stop a Wiki service.").expectString("wikiName", minLength=1)
 ap.createCommand("wikistart", "Start a Wiki service.").expectString("wikiName", minLength=1)
-ap.createCommand("status", "List full status of HTTP service(s) and local Wikis.")
+ap.createCommand("status", "List status of HTTP service(s) and local Wikis.")
+ap.createCommand("statusfull", "List full status of HTTP service(s) and local Wikis.")
 ap.createCommand("start", "Start relevant service(s) to run a specific wiki.").expectString("wikiName", minLength=1)
 ap.createCommand("stop", "Stop relevant service(s) to terminate a specific wiki.").expectString("wikiName", minLength=1)
 
 
 
 
+#
+# @param	dict cfg			The content of the user specific configuration file "~/.config/wikilocalctrl.json"
+#
 @jk_typing.checkFunctionSignature()
 def getHttpdCfg(cfg:dict):
 	if cfg["httpBinDir"] is None:
@@ -96,6 +102,7 @@ def waitForService(fnGetPIDInfos, name:str, log:jk_logging.AbstractLogger):
 #
 # Get a list of all existing Wikis (= running and not running).
 #
+# @param		dict cfg			The content of the user specific configuration file "~/.config/wikilocalctrl.json"
 # @return		str wwwWikiRootDir		The root directory for all local wikis
 # @return		str[] wikiName			The names of the wikis available.
 #
@@ -121,6 +128,9 @@ def listWikis(cfg:dict) -> typing.Tuple[str,typing.List[str]]:
 
 
 
+#
+# @param		dict cfg			The content of the user specific configuration file "~/.config/wikilocalctrl.json"
+#
 def cmd_httpstatus(cfg:dict, log):
 	startNGINXScriptPath, startPHPFPMScriptPath = getHttpdCfg(cfg)
 	h = jk_mediawiki.MediaWikiLocalUserServiceMgr(startNGINXScriptPath, startPHPFPMScriptPath, userName)
@@ -149,11 +159,27 @@ def cmd_httpstatus(cfg:dict, log):
 
 
 
-def cmd_wikistatus(cfg:dict, log):
+
+
+def _formatMBytes(n:int) -> str:
+	s = str(round(n, 1)) + "M"
+	while len(s) < 7:
+		s = " " + s
+	return s
+#
+
+#
+# @param	dict cfg			The content of the user specific configuration file "~/.config/wikilocalctrl.json"
+#
+def cmd_wikistatus(cfg:dict, bWithDiskSpace:bool, log):
 	wwwWikiRootDir, wikis = listWikis(cfg)
 
 	t = jk_console.SimpleTable()
-	t.addRow("Wiki", "MW Version", "SMW Version", "Status", "Cron Script Processes").hlineAfterRow = True
+	rowData = [ "Wiki", "MW Version", "SMW Version", "Status", "Last configuration", "Last use", "Cron Script Processes" ]
+	if bWithDiskSpace:
+		rowData.append("SizeRO")
+		rowData.append("SizeRW")
+	t.addRow(*rowData).hlineAfterRow = True
 	r = jk_console.Console.RESET
 
 	for wiki in wikis:
@@ -161,18 +187,61 @@ def cmd_wikistatus(cfg:dict, log):
 		bIsRunning = h.isCronScriptRunning()
 		c = jk_console.Console.ForeGround.STD_GREEN if bIsRunning else jk_console.Console.ForeGround.STD_DARKGRAY
 		smVersion = h.getSMWVersion()
-		t.addRow(
+		lastCfgTime = h.getLastConfigurationTimeStamp()
+		lastUseTime = h.getLastUseTimeStamp()
+		rowData = [
 			wiki,
 			str(h.getVersion()),
 			str(smVersion) if smVersion else "-",
 			"running" if bIsRunning else "stopped",
+			lastCfgTime.strftime("%Y-%m-%d %H:%M") if lastCfgTime else "-",
+			lastUseTime.strftime("%Y-%m-%d %H:%M") if lastUseTime else "-",
 			str([ x["pid"] for x in h.getCronProcesses() ]) if bIsRunning else "-",
-			).color = c
+		]
+		if bWithDiskSpace:
+			diskUsage = h.getDiskUsage()
+			rowData.append(_formatMBytes(diskUsage.ro / 1048576))
+			rowData.append(_formatMBytes(diskUsage.rw / 1048576))
+		t.addRow(*rowData).color = c
 
 	print()
 	t.print()
 #
 
+
+
+
+def _formatGBytes(n:int) -> str:
+	s = str(round(n, 1)) + "G"
+	return s
+#
+
+#
+# @param	dict cfg			The content of the user specific configuration file "~/.config/wikilocalctrl.json"
+#
+def cmd_diskfree(cfg:dict, log):
+	print()
+
+	mounter = jk_mounting.Mounter()
+	mi = mounter.getMountInfoByFilePath(cfg["wwwWikiRootDir"])
+	stdout, stderr, exitcode = jk_sysinfo.run(None, "/bin/df -BK")
+	ret = jk_sysinfo.parse_df(stdout, stderr, exitcode)[mi.mountPoint]
+
+	print("Mount point:", mi.mountPoint)
+
+	fBlock = (ret["spaceTotal"] - ret["spaceFree"]) / ret["spaceTotal"]
+	barLength = jk_console.Console.width() - 20
+	iBlock = int(round(fBlock*barLength))
+	text = "{0} {1:.1f}% filled".format( "#"*iBlock + "-"*(barLength-iBlock), fBlock*100)
+	print(text)
+
+	print(
+		_formatGBytes((ret["spaceTotal"] - ret["spaceFree"]) / 1073741824),
+		"of",
+		_formatGBytes(ret["spaceTotal"] / 1073741824),
+		"used."
+		)
+#
 
 
 
@@ -330,7 +399,7 @@ try:
 	# ----------------------------------------------------------------
 
 	elif cmdName == "wikistatus":
-		cmd_wikistatus(cfg, log)
+		cmd_wikistatus(cfg, False, log)
 		print()
 		sys.exit(0)
 
@@ -464,7 +533,23 @@ try:
 
 	elif cmdName == "status":
 		cmd_httpstatus(cfg, log)
-		cmd_wikistatus(cfg, log)
+		cmd_wikistatus(cfg, False, log)
+		print()
+		sys.exit(0)
+
+	# ----------------------------------------------------------------
+
+	elif cmdName == "statusfull":
+		cmd_httpstatus(cfg, log)
+		cmd_wikistatus(cfg, True, log)
+		cmd_diskfree(cfg, log)
+		print()
+		sys.exit(0)
+
+	# ----------------------------------------------------------------
+
+	elif cmdName == "df":
+		cmd_diskfree(cfg, log)
 		print()
 		sys.exit(0)
 

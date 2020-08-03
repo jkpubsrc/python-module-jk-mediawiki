@@ -43,7 +43,7 @@ setup(
 		"bin/wikilocalctrl.py",
 	],
 	url = "https://github.com/jkpubsrc/python-module-jk-mediawiki",
-	version = "0.2020.6.8",
+	version = "0.2020.8.3",
 	zip_safe = False,
 	long_description = readme(),
 	long_description_content_type="text/markdown",

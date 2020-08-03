@@ -1,11 +1,10 @@
 
 
+import math
 import os
-import signal
-import subprocess
 import typing
+import datetime
 
-import jk_pathpatternmatcher2
 import jk_utils
 import jk_sysinfo
 import jk_json
@@ -13,6 +12,8 @@ import jk_mediawiki
 import jk_logging
 from jk_typing import *
 import jk_version
+
+from .MediaWikiDiskUsageInfo import MediaWikiDiskUsageInfo
 
 
 
@@ -32,6 +33,14 @@ import jk_version
 #	* A script - here named "mywikicron-bg.sh" - is capable of starting this script as background process (using `nohup`).
 #
 class MediaWikiLocalUserInstallationMgr(object):
+
+	# @field		str __userName					The name of the user account under which NGINX, PHP and the Wiki cron process are executed.
+	# @field		str __wikiDirPath				The absolute directory path where the MediaWiki installation can be found.
+	# @field		str __wikiDirName				The name of the directory the Wiki resides in
+	# @field		str __wikiDBDirPath				The directory where all the databases are stored
+	# @field		str __cronScriptFilePath		The path of the cron script file
+	# @field		str __cronScriptDirPath			For convenience: The directory where the cron script file resides in
+	# @field		str __cronScriptFileName		For convenience: The name of the cron script file without it's parent directory information
 
 	#
 	# Configuration parameters:
@@ -100,6 +109,26 @@ class MediaWikiLocalUserInstallationMgr(object):
 
 		self.__cronScriptDirPath = os.path.dirname(self.__cronScriptFilePath) if self.__cronScriptFilePath else None
 		self.__cronScriptFileName = os.path.basename(self.__cronScriptFilePath) if self.__cronScriptFilePath else None
+	#
+
+	@property
+	def wikiLocalSettingsFilePath(self) -> str:
+		filePath = os.path.join(self.__wikiDirPath, "LocalSettings.php")
+		if os.path.isfile(filePath):
+			return filePath
+		else:
+			# raise Exception("No such file: " + filePath)
+			return None
+	#
+
+	@property
+	def wikiExtensionsDirPath(self) -> str:
+		wikiExtensionsDirPath = os.path.join(self.__wikiDirPath, "extensions")
+		if os.path.isdir(wikiExtensionsDirPath):
+			return wikiExtensionsDirPath
+		else:
+			#raise Exception("No such directory:" + wikiExtensionsDirPath)
+			return None
 	#
 
 	@property
@@ -231,6 +260,108 @@ class MediaWikiLocalUserInstallationMgr(object):
 			j = jk_json.loadFromFile(p)
 			return jk_version.Version(j["version"])
 		return None
+	#
+
+	def getLastConfigurationTimeStamp(self) -> typing.Union[datetime.datetime,None]:
+		t = -1
+
+		dirPath = self.wikiExtensionsDirPath
+		if dirPath:
+			for feExt in os.scandir(dirPath):
+				if feExt.is_dir():
+					try:
+						mtime = feExt.stat(follow_symlinks=False).st_mtime
+						if mtime > t:
+							t = mtime
+					except:
+						pass
+					for fe in os.scandir(feExt.path):
+						if fe.is_file():
+							try:
+								mtime = fe.stat(follow_symlinks=False).st_mtime
+								if mtime > t:
+									t = mtime
+							except:
+								pass
+
+		filePath = self.wikiLocalSettingsFilePath
+		if filePath:
+			try:
+				mtime = os.stat(filePath).st_mtime
+				if mtime > t:
+					t = mtime
+			except:
+				pass
+
+		if t < 0:
+			return None
+		else:
+			return datetime.datetime.fromtimestamp(mtime)
+	#
+
+	def getLastUseTimeStamp(self) -> typing.Union[datetime.datetime,None]:
+		t = -1
+
+		dirPaths = [ self.__wikiDirPath ]
+		if self.__wikiDBDirPath:
+			dirPaths.append(self.__wikiDBDirPath)
+
+		for dirPath in dirPaths:
+			for fe in os.scandir(dirPath):
+				try:
+					mtime = fe.stat(follow_symlinks=False).st_mtime
+					if mtime > t:
+						t = mtime
+				except:
+					pass
+
+		if t < 0:
+			return None
+		else:
+			return datetime.datetime.fromtimestamp(mtime)
+	#
+
+	def __getDiskSpaceNonRecursively(self, dirPath:str):
+		ret = 0
+		for fe in os.scandir(dirPath):
+			if fe.is_symlink():
+				continue
+			elif fe.is_file():
+				n = fe.stat().st_size
+				ret += int(math.ceil(n / 4096) * 4096)
+		return ret
+	#
+
+	def __getDiskSpaceRecursively(self, dirPath:str):
+		ret = 0
+		for fe in os.scandir(dirPath):
+			if fe.is_symlink():
+				continue
+			elif fe.is_file():
+				n = fe.stat().st_size
+				ret += int(math.ceil(n / 4096) * 4096)
+			elif fe.is_dir():
+				ret += self.__getDiskSpaceRecursively(fe.path)
+		return ret
+	#
+
+	def getDiskUsage(self) -> MediaWikiDiskUsageInfo:
+		sizeCache = self.__getDiskSpaceRecursively(os.path.join(self.__wikiDirPath, "cache"))
+		sizeImages = self.__getDiskSpaceRecursively(os.path.join(self.__wikiDirPath, "images"))
+		sizeExtensions = self.__getDiskSpaceRecursively(os.path.join(self.__wikiDirPath, "extensions"))
+		sizeDatabase = self.__getDiskSpaceRecursively(self.__wikiDBDirPath)
+
+		sizeCore = 0
+		for fe in os.scandir(self.__wikiDirPath):
+			if fe.is_symlink():
+				continue
+			elif fe.is_file():
+				n = fe.stat().st_size
+				sizeCore += int(math.ceil(n / 4096) * 4096)
+			elif fe.is_dir() and fe.name not in [ "images", "cache", "extensions" ]:
+				sizeCore += self.__getDiskSpaceRecursively(fe.path)
+
+		return MediaWikiDiskUsageInfo(sizeCore, sizeCache, sizeImages, sizeExtensions, sizeDatabase)
 	#
 
 #
