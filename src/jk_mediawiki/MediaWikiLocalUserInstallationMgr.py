@@ -14,6 +14,7 @@ from jk_typing import *
 import jk_version
 
 from .MediaWikiDiskUsageInfo import MediaWikiDiskUsageInfo
+from .MediaWikiExtensionInfo import MediaWikiExtensionInfo
 
 
 
@@ -293,7 +294,7 @@ class MediaWikiLocalUserInstallationMgr(object):
 			except:
 				pass
 
-		if t < 0:
+		if t <= 0:
 			return None
 		else:
 			return datetime.datetime.fromtimestamp(mtime)
@@ -315,7 +316,7 @@ class MediaWikiLocalUserInstallationMgr(object):
 				except:
 					pass
 
-		if t < 0:
+		if t <= 0:
 			return None
 		else:
 			return datetime.datetime.fromtimestamp(mtime)
@@ -343,6 +344,51 @@ class MediaWikiLocalUserInstallationMgr(object):
 			elif fe.is_dir():
 				ret += self.__getDiskSpaceRecursively(fe.path)
 		return ret
+	#
+
+	def __getLatestUseTimeStampRecursively(self, dirPath:str):
+		t = 0
+		for fe in os.scandir(dirPath):
+			if fe.is_symlink():
+				continue
+			elif fe.is_file():
+				mtime = fe.stat(follow_symlinks=False).st_mtime
+				if mtime > t:
+					t = mtime
+			elif fe.is_dir():
+				mtime = self.__getLatestUseTimeStampRecursively(fe.path)
+				if mtime > t:
+					t = mtime
+		return t
+	#
+
+	def getExtensionInfos(self):
+		for fe in os.scandir(self.wikiExtensionsDirPath):
+			if fe.is_symlink() or not fe.is_dir():
+				continue
+			extensionDirPath = fe.path
+
+			name = fe.name
+
+			version = None
+
+			size = self.__getDiskSpaceRecursively(extensionDirPath)
+
+			t = self.__getLatestUseTimeStampRecursively(extensionDirPath)
+
+			if t <= 0:
+				dt = None
+			else:
+				dt = datetime.datetime.fromtimestamp(t)
+
+			extensionJSONFilePath = os.path.join(extensionDirPath, "extension.json")
+			if os.path.isfile(extensionJSONFilePath):
+				jDict = jk_json.loadFromFile(extensionJSONFilePath)
+				name = jDict["name"]
+				if "version" in jDict:
+					version = jDict["version"]
+
+			yield MediaWikiExtensionInfo(fe.name, version, size, dt)
 	#
 
 	def getDiskUsage(self) -> MediaWikiDiskUsageInfo:

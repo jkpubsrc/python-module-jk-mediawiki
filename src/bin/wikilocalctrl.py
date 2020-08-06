@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 
 import time
+import datetime
 import os
 import getpass
 import sys
@@ -65,6 +66,7 @@ ap.createCommand("status", "List status of HTTP service(s) and local Wikis.")
 ap.createCommand("statusfull", "List full status of HTTP service(s) and local Wikis.")
 ap.createCommand("start", "Start relevant service(s) to run a specific wiki.").expectString("wikiName", minLength=1)
 ap.createCommand("stop", "Stop relevant service(s) to terminate a specific wiki.").expectString("wikiName", minLength=1)
+ap.createCommand("extensionmatrix", "Display a matrix about all wiki extensions.")
 
 
 
@@ -123,7 +125,7 @@ def listWikis(cfg:dict) -> typing.Tuple[str,typing.List[str]]:
 			and os.path.isfile(basePath + "cron.sh") \
 			and os.path.isfile(basePath + "cron-bg.sh"):
 			ret.append(candidate)
-	return cfg["wwwWikiRootDir"], ret
+	return cfg["wwwWikiRootDir"], sorted(ret)
 #
 
 
@@ -230,9 +232,9 @@ def cmd_diskfree(cfg:dict, log):
 	print("Mount point:", mi.mountPoint)
 
 	fBlock = (ret["spaceTotal"] - ret["spaceFree"]) / ret["spaceTotal"]
-	barLength = jk_console.Console.width() - 20
+	barLength = min(jk_console.Console.width(), 140) - 20
 	iBlock = int(round(fBlock*barLength))
-	text = "{0} {1:.1f}% filled".format( "#"*iBlock + "-"*(barLength-iBlock), fBlock*100)
+	text = "{0} {1:.1f}% filled".format( "#"*iBlock + ":"*(barLength-iBlock), fBlock*100)
 	print(text)
 
 	print(
@@ -241,6 +243,87 @@ def cmd_diskfree(cfg:dict, log):
 		_formatGBytes(ret["spaceTotal"] / 1073741824),
 		"used."
 		)
+#
+
+
+
+
+def cmd_extensionmatrix(cfg:dict, log):
+	print()
+
+	wwwWikiRootDir, wikiDirNames = listWikis(cfg)
+	wikiNames = sorted(wikiDirNames)
+	wikis = [ jk_mediawiki.MediaWikiLocalUserInstallationMgr(os.path.join(wwwWikiRootDir, wiki), userName) for wiki in wikiNames ]
+
+	allExtensionNames = set()
+	for i, wikiName in enumerate(wikiNames):
+		h = wikis[i]
+		for extInfo in h.getExtensionInfos():
+			allExtensionNames.add(extInfo.name)
+	allExtensionNames = sorted(allExtensionNames)
+
+	allExtensionsRowIndex = { name:(i+2) for i, name in enumerate(allExtensionNames) }
+
+	# prepare data matrix
+
+	columnNames = [ "" ] + allExtensionNames
+	rowNames = [ "" ] + wikiNames
+	rowNames2 = [ "" ] + [ str(w.getVersion()) for w in wikis ]
+	_emptyList = [ "-" for x in wikiNames ]
+	_emptyList2 = [ 0 for x in wikiNames ]
+
+	table = jk_console.SimpleTable()
+	table.addRow(*rowNames)
+	table.addRow(*rowNames2).hlineAfterRow = True
+	table.row(0).color = jk_console.Console.ForeGround.STD_LIGHTCYAN
+	table.row(1).color = jk_console.Console.ForeGround.STD_LIGHTCYAN
+
+	rawTimeData = []
+
+	for extensionName in allExtensionNames:
+		dataRow = [ extensionName ] + _emptyList
+		table.addRow(*dataRow)[0].color = jk_console.Console.ForeGround.STD_LIGHTCYAN
+		rawTimeData.append(list(_emptyList2))
+
+	# fill with raw data
+
+	dtEpoch = datetime.datetime(1970, 1, 1)
+	for _x, h in enumerate(wikis):
+		for extInfo in h.getExtensionInfos():
+			colNo = _x + 1
+			rowNo = allExtensionsRowIndex[extInfo.name]
+
+			s = str(extInfo.version) if extInfo.version else None
+			if extInfo.latestTimeStamp:
+				if s is None:
+					s = extInfo.latestTimeStamp.strftime("%Y-%m-%d")
+				rawTimeData[rowNo - 2][_x] = (extInfo.latestTimeStamp - dtEpoch).total_seconds()
+
+			if s:
+				table.row(rowNo)[colNo].value = s
+			else:
+				table.row(rowNo)[colNo].value = "?"
+
+	for _y in range(0, len(rawTimeData)):
+		row = rawTimeData[_y]
+		maxX = -1
+		maxT2 = 0
+		maxT = 0
+		for _x in range(0, len(row)):
+			if row[_x] > maxT:
+				maxT2 = maxT
+				maxT = row[_x]
+				maxX = _x
+			table.row(_y + 2)[_x + 1].color = jk_console.Console.ForeGround.STD_DARKGRAY
+		for _x in range(0, len(row)):
+			if (maxT > 0) and (row[_x] == maxT):
+				table.row(_y + 2)[_x + 1].color = jk_console.Console.ForeGround.STD_YELLOW
+			elif (maxT2 > 0) and (row[_x] == maxT2):
+				table.row(_y + 2)[_x + 1].color = jk_console.Console.ForeGround.STD_LIGHTGRAY
+
+	# print table
+
+	table.print()
 #
 
 
@@ -534,6 +617,7 @@ try:
 	elif cmdName == "status":
 		cmd_httpstatus(cfg, log)
 		cmd_wikistatus(cfg, False, log)
+		cmd_diskfree(cfg, log)
 		print()
 		sys.exit(0)
 
@@ -550,6 +634,14 @@ try:
 
 	elif cmdName == "df":
 		cmd_diskfree(cfg, log)
+		print()
+		sys.exit(0)
+
+
+	# ----------------------------------------------------------------
+
+	elif cmdName == "extensionmatrix":
+		cmd_extensionmatrix(cfg, log)
 		print()
 		sys.exit(0)
 
