@@ -13,6 +13,7 @@ import jk_console
 from .lang_support_php import *
 
 from .MediaWikiLocalSettingsVariableAssignment import MediaWikiLocalSettingsVariableAssignment
+from .MediaWikiLocalSettingsComplexVariableAssignment import MediaWikiLocalSettingsComplexVariableAssignment
 from .MediaWikiLocalSettingsArrayAppend import MediaWikiLocalSettingsArrayAppend
 
 
@@ -126,6 +127,28 @@ class MediaWikiLocalSettingsFile(object):
 			]),
 			__VALUE_PATTERN.derive(assignToVarTyped = "value").setTag("varType", "value"),
 		]),
+		__OPTIONAL_SPACE_OR_NEWLINE,
+		TokenPattern("semicolon"),
+	])
+
+	__STMT_VARIABLE_ASSIGNMENT_2 = TokenPatternSequence([
+		TokenPatternOptional(TokenPatternSequence([
+			TokenPattern("commentx").setTag("active", False),
+			__OPTIONAL_SPACE_OR_NEWLINE,
+		])),
+		TokenPattern("varref", assignToVar = "varName"),
+		__OPTIONAL_SPACE_OR_NEWLINE,
+		TokenPattern("op", "="),
+		__OPTIONAL_SPACE_OR_NEWLINE,
+		TokenPatternRepeat(
+			TokenPatternAlternatives([
+				TokenPattern("SPACE"),
+				TokenPattern("varref").derive(assignToVarTyped = "x", bVarIsArray = True),
+				TokenPattern("op", ".").derive(assignToVarTyped = "x", bVarIsArray = True),
+				TokenPattern("str1").derive(assignToVarTyped = "x", bVarIsArray = True),
+				TokenPattern("str2").derive(assignToVarTyped = "x", bVarIsArray = True),
+			]),
+		),
 		__OPTIONAL_SPACE_OR_NEWLINE,
 		TokenPattern("semicolon"),
 	])
@@ -255,7 +278,7 @@ class MediaWikiLocalSettingsFile(object):
 		tokens = list(PHPTokenizer().tokenize(rawText, bEmitWhiteSpaces = True, bEmitComments = True, bEmitNewLines = True))
 
 		# resultDataList will receive 2-tuples where
-		# the first item indicates the entry type - either "arrayAppend", "varAssign" or "other" - and
+		# the first item indicates the entry type - either "arrayAppend", "varAssignComplex", "varAssign" or "other" - and
 		# the second item will either be a token or a MediaWikiLocalSettingsValue.
 		resultDataList = []
 		pos = 0
@@ -263,17 +286,32 @@ class MediaWikiLocalSettingsFile(object):
 			(bResult, n, data) = MediaWikiLocalSettingsFile.__STMT_VARIABLE_APPENDING.tryMatch(tokens, pos, MediaWikiLocalSettingsFile.__PARSING_DEFAULTS)
 			if bResult:
 				assert n > 0
+				# interpret pattern encountered and store it
 				resultDataList.append( ( "arrayAppend", MediaWikiLocalSettingsArrayAppend.parseFromDict(self.__changedFlag, data) ) )
+				# advance
 				pos += n
+
 			else:
 				(bResult, n, data) = MediaWikiLocalSettingsFile.__STMT_VARIABLE_ASSIGNMENT.tryMatch(tokens, pos, MediaWikiLocalSettingsFile.__PARSING_DEFAULTS)
 				if bResult:
 					assert n > 0
+					# interpret pattern encountered and store it
 					resultDataList.append( ( "varAssign", MediaWikiLocalSettingsVariableAssignment.parseFromDict(self.__changedFlag, data) ) )
+					# advance
 					pos += n
+
 				else:
-					resultDataList.append( ( "other", tokens[pos] ) )
-					pos += 1
+					(bResult, n, data) = MediaWikiLocalSettingsFile.__STMT_VARIABLE_ASSIGNMENT_2.tryMatch(tokens, pos, MediaWikiLocalSettingsFile.__PARSING_DEFAULTS)
+					if bResult:
+						assert n > 0
+						# interpret pattern encountered and store it
+						resultDataList.append( ( "varAssignComplex", MediaWikiLocalSettingsComplexVariableAssignment.parseFromDict(self.__changedFlag, data) ) )
+						# advance
+						pos += n
+
+					else:
+						resultDataList.append( ( "other", tokens[pos] ) )
+						pos += 1
 
 		#for b, t in resultDataList:
 		#	print(str(b) + "\t\t" + str(t))
@@ -370,55 +408,67 @@ class MediaWikiLocalSettingsFile(object):
 
 
 
-	def getVarValue(self, varName):
+	def getVarValue(self, varName:str):
 		assert isinstance(varName, str)
 
-		for stype, item in self.__data:
-			if (stype == "arrayAppend") or (stype == "varAssign"):
-				if item.varName == varName:
-					v = item.value
-					if isinstance(v, TypedValue):
-						return v.value
-					elif isinstance(v, list):
-						ret = []
-						for d in v:
-							ret.append(d.value)
-						return ret
-					else:
-						raise Exception("Implementation Error!")
+		item = self.getVar(varName)
+		if item is not None:
+			if isinstance(item, MediaWikiLocalSettingsComplexVariableAssignment):
+				# type: MediaWikiLocalSettingsComplexVariableAssignment
+				return item.getValue(self.getVarValueE)
+			else:
+				# type: TypeValue, MediaWikiLocalSetttingsVariableAssignment, MediaWikiLocalSettingsArrayAppend
+				v = item.value
+				if isinstance(v, TypedValue):
+					return v.value
+				elif isinstance(v, list):
+					ret = []
+					for d in v:
+						ret.append(d.value)
+					return ret
+				else:
+					raise Exception("Implementation Error!")
 
 		return None
 	#
 
 
 
-	def getVarValueE(self, varName):
+	#
+	# Get a variable-like object.
+	#
+	# @return		someObject			This object returned is either of type:
+	#									* TypeValue - if it is a constant
+	#									* MediaWikiLocalSetttingsVariableAssignment - if it is a constant assigned to a variable
+	#									* MediaWikiLocalSetttingsComplexVariableAssignment - if it is a complex variable assignment
+	#									* MediaWikiLocalSettingsArrayAppend - if it is a value appended to an array
+	#
+	def getVarValueE(self, varName:str):
 		assert isinstance(varName, str)
 
-		for stype, item in self.__data:
-			if (stype == "arrayAppend") or (stype == "varAssign"):
-				if item.varName == varName:
-					v = item.value
-					if isinstance(v, TypedValue):
-						return v.value
-					elif isinstance(v, list):
-						ret = []
-						for d in v:
-							ret.append(d.value)
-						return ret
-					else:
-						raise Exception("Implementation Error!")
+		item = self.getVarValue(varName)
+		if item is not None:
+			return item
 
 		raise Exception("No such variable: " + repr(varName))
 	#
 
 
 
-	def getVar(self, varName):
+	#
+	# Get a variable-like object.
+	#
+	# @return		someObject			This object returned is either of type:
+	#									* TypeValue - if it is a constant
+	#									* MediaWikiLocalSetttingsVariableAssignment - if it is a constant assigned to a variable
+	#									* MediaWikiLocalSetttingsComplexVariableAssignment - if it is a complex variable assignment
+	#									* MediaWikiLocalSettingsArrayAppend - if it is a value appended to an array
+	#
+	def getVar(self, varName:str):
 		assert isinstance(varName, str)
 
 		for stype, item in self.__data:
-			if (stype == "arrayAppend") or (stype == "varAssign"):
+			if stype in [ "arrayAppend", "varAssign", "varAssignComplex" ]:
 				if item.varName == varName:
 					return item
 

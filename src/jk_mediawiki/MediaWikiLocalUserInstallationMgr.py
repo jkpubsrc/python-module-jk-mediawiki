@@ -76,7 +76,14 @@ class MediaWikiLocalUserInstallationMgr(object):
 		mwLocalSettings = jk_mediawiki.MediaWikiLocalSettingsFile()
 		mwLocalSettings.load(dirPath = mediaWikiDirPath)
 
-		wikiSiteName = mwLocalSettings.getVarValueE("wgSitename")
+		wikiSiteName = mwLocalSettings.getVarValue("wgSitename")
+		if wikiSiteName is None:
+			wikiSiteName = mwLocalSettings.getVarValue("siteName")
+		if wikiSiteName is None:
+			wikiSiteName = mwLocalSettings.getVarValue("wikiSiteName")
+		if wikiSiteName is None:
+			raise Exception("None of these variables exist: $wikiSiteName, $siteName, $wgSitename")
+
 		dbType = mwLocalSettings.getVarValueE("wgDBtype")
 		if dbType == "sqlite":
 			sqliteDataDir = mwLocalSettings.getVarValueE("wgSQLiteDataDir")

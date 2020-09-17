@@ -29,10 +29,12 @@ def tokenValueToPHP(dataType:str, value):
 		return "\'" + PHP.encodeString(value) + "\'"
 	elif dataType == "int":
 		return str(value)
+	elif dataType == "op":
+		return value
 	elif dataType == "word":
 		return value
 	else:
-		raise Exception("Implementation Error! (" + dataType + ")")
+		raise Exception("Implementation Error! (" + repr(dataType) + ", " + repr(value) + ")")
 #
 
 #### Add a "toPHP()" method to TypedValue

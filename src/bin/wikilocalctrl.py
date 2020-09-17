@@ -88,9 +88,11 @@ def getHttpdCfg(cfg:dict):
 #
 
 @jk_typing.checkFunctionSignature()
-def waitForService(fnGetPIDInfos, name:str, log:jk_logging.AbstractLogger):
+def waitForServiceStarted(fnGetPIDInfos, name:str, log:jk_logging.AbstractLogger):
+	assert callable(fnGetPIDInfos)
+
 	countDown = 20
-	while countDown > 0:
+	while True:
 		time.sleep(0.5)
 		pidInfos = fnGetPIDInfos()
 		if pidInfos:
@@ -101,12 +103,27 @@ def waitForService(fnGetPIDInfos, name:str, log:jk_logging.AbstractLogger):
 			raise Exception("Failed to start " + name + "!")
 #
 
+@jk_typing.checkFunctionSignature()
+def waitForServiceStopped(fnGetPIDInfos, name:str, log:jk_logging.AbstractLogger):
+	assert callable(fnGetPIDInfos)
+
+	countDown = 40
+	while True:
+		time.sleep(0.5)
+		pidInfos = fnGetPIDInfos()
+		if not pidInfos:
+			break
+		countDown-= 1
+		if countDown == 0:
+			raise Exception("Failed to stop " + name + "!")
+#
+
 #
 # Get a list of all existing Wikis (= running and not running).
 #
 # @param		dict cfg			The content of the user specific configuration file "~/.config/wikilocalctrl.json"
 # @return		str wwwWikiRootDir		The root directory for all local wikis
-# @return		str[] wikiName			The names of the wikis available.
+# @return		str[] wikiNames			The names of the wikis available.
 #
 def listWikis(cfg:dict) -> typing.Tuple[str,typing.List[str]]:
 	if cfg["wwwWikiRootDir"] is None:
@@ -170,11 +187,20 @@ def _formatMBytes(n:int) -> str:
 	return s
 #
 
+def wrapped_cmd_wikistatus(cfg:dict, bWithDiskSpace:bool, log):
+	blog = jk_logging.BufferLogger.create()
+	try:
+		cmd_wikistatus(cfg, bWithDiskSpace, blog)
+	except jk_logging.ExceptionInChildContextException as ee:
+		blog.forwardTo(log)
+		raise
+#
+
 #
 # @param	dict cfg			The content of the user specific configuration file "~/.config/wikilocalctrl.json"
 #
 def cmd_wikistatus(cfg:dict, bWithDiskSpace:bool, log):
-	wwwWikiRootDir, wikis = listWikis(cfg)
+	wwwWikiRootDir, wikiNames = listWikis(cfg)
 
 	t = jk_console.SimpleTable()
 	rowData = [ "Wiki", "MW Version", "SMW Version", "Status", "Last configuration", "Last use", "Cron Script Processes" ]
@@ -184,27 +210,28 @@ def cmd_wikistatus(cfg:dict, bWithDiskSpace:bool, log):
 	t.addRow(*rowData).hlineAfterRow = True
 	r = jk_console.Console.RESET
 
-	for wiki in wikis:
-		h = jk_mediawiki.MediaWikiLocalUserInstallationMgr(os.path.join(wwwWikiRootDir, wiki), userName)
-		bIsRunning = h.isCronScriptRunning()
-		c = jk_console.Console.ForeGround.STD_GREEN if bIsRunning else jk_console.Console.ForeGround.STD_DARKGRAY
-		smVersion = h.getSMWVersion()
-		lastCfgTime = h.getLastConfigurationTimeStamp()
-		lastUseTime = h.getLastUseTimeStamp()
-		rowData = [
-			wiki,
-			str(h.getVersion()),
-			str(smVersion) if smVersion else "-",
-			"running" if bIsRunning else "stopped",
-			lastCfgTime.strftime("%Y-%m-%d %H:%M") if lastCfgTime else "-",
-			lastUseTime.strftime("%Y-%m-%d %H:%M") if lastUseTime else "-",
-			str([ x["pid"] for x in h.getCronProcesses() ]) if bIsRunning else "-",
-		]
-		if bWithDiskSpace:
-			diskUsage = h.getDiskUsage()
-			rowData.append(_formatMBytes(diskUsage.ro / 1048576))
-			rowData.append(_formatMBytes(diskUsage.rw / 1048576))
-		t.addRow(*rowData).color = c
+	for wiki in wikiNames:
+		with log.descend("Checking wiki: " + wiki) as log2:
+			h = jk_mediawiki.MediaWikiLocalUserInstallationMgr(os.path.join(wwwWikiRootDir, wiki), userName)
+			bIsRunning = h.isCronScriptRunning()
+			c = jk_console.Console.ForeGround.STD_GREEN if bIsRunning else jk_console.Console.ForeGround.STD_DARKGRAY
+			smVersion = h.getSMWVersion()
+			lastCfgTime = h.getLastConfigurationTimeStamp()
+			lastUseTime = h.getLastUseTimeStamp()
+			rowData = [
+				wiki,
+				str(h.getVersion()),
+				str(smVersion) if smVersion else "-",
+				"running" if bIsRunning else "stopped",
+				lastCfgTime.strftime("%Y-%m-%d %H:%M") if lastCfgTime else "-",
+				lastUseTime.strftime("%Y-%m-%d %H:%M") if lastUseTime else "-",
+				str([ x["pid"] for x in h.getCronProcesses() ]) if bIsRunning else "-",
+			]
+			if bWithDiskSpace:
+				diskUsage = h.getDiskUsage()
+				rowData.append(_formatMBytes(diskUsage.ro / 1048576))
+				rowData.append(_formatMBytes(diskUsage.rw / 1048576))
+			t.addRow(*rowData).color = c
 
 	print()
 	t.print()
@@ -363,10 +390,13 @@ try:
 	if os.path.isfile(cfgPath):
 		cfg = jk_json.loadFromFile(cfgPath)
 	else:
-		cfg = {}
-	for key in [ "wwwWikiRootDir", "httpBinDir"]:
+		raise Exception("No configuration file: '~/.config/wikilocalctrl.json'")
+	for key in [ "wwwWikiRootDir", "httpBinDir" ]:
 		if (key in parsedArgs.optionData) and (parsedArgs.optionData[key] is not None):
 			cfg[key] = parsedArgs.optionData[key]
+	for key in [ "wwwWikiRootDir", "httpBinDir" ]:
+		if not os.path.isdir(cfg[key]):
+			raise Exception(key + ": Directory does not exist: " + repr(cfg[key]))
 
 	# process the first command
 
@@ -426,14 +456,14 @@ try:
 			log.notice("Local NGINX: Already running")
 		else:
 			h.startNGINX(log.descend("Local NGINX: Starting ..."))
-			waitForService(h.getNGINXMasterProcesses, "NGINX", log)
+			waitForServiceStarted(h.getNGINXMasterProcesses, "NGINX", log)
 
 		phpPIDs = h.getPHPFPMMasterProcesses()
 		if phpPIDs:
 			log.notice("Local PHP-FPM: Already running")
 		else:
 			h.startPHPFPM(log.descend("Local PHP-FPM: Starting ..."))
-			waitForService(h.getPHPFPMMasterProcesses, "PHP-FPM", log)
+			waitForServiceStarted(h.getPHPFPMMasterProcesses, "PHP-FPM", log)
 
 		sys.exit(0)
 
@@ -456,26 +486,16 @@ try:
 			log.notice("Local PHP-FPM: Not running")
 
 		phpPIDs = h.getNGINXMasterProcesses()
-		if phpPIDs:
-			while True:
-				time.sleep(0.5)
-				nginxPIDs = h.getNGINXMasterProcesses()
-				if not nginxPIDs:
-					break
+		waitForServiceStopped(h.getNGINXMasterProcesses, "NGINX", log)
 
 		phpPIDs = h.getPHPFPMMasterProcesses()
-		if phpPIDs:
-			while True:
-				time.sleep(0.5)
-				phpPIDs = h.getPHPFPMMasterProcesses()
-				if not phpPIDs:
-					break
+		waitForServiceStopped(h.getPHPFPMMasterProcesses, "PHP-FPM", log)
 
 		h.startNGINX(log.descend("Local NGINX: Starting ..."))
-		waitForService(h.getNGINXMasterProcesses, "NGINX", log)
+		waitForServiceStarted(h.getNGINXMasterProcesses, "NGINX", log)
 
 		h.startPHPFPM(log.descend("Local PHP-FPM: Starting ..."))
-		waitForService(h.getPHPFPMMasterProcesses, "PHP-FPM", log)
+		waitForServiceStarted(h.getPHPFPMMasterProcesses, "PHP-FPM", log)
 
 		sys.exit(0)
 
@@ -489,9 +509,9 @@ try:
 	# ----------------------------------------------------------------
 
 	elif cmdName == "wikistop":
-		wwwWikiRootDir, wikis = listWikis(cfg)
+		wwwWikiRootDir, wikiNames = listWikis(cfg)
 		wiki = cmdArgs[0]
-		if wiki not in wikis:
+		if wiki not in wikiNames:
 			raise Exception("No such Wiki: \"" + wiki + "\"")
 
 		# ----
@@ -508,9 +528,9 @@ try:
 	# ----------------------------------------------------------------
 
 	elif cmdName == "wikistart":
-		wwwWikiRootDir, wikis = listWikis(cfg)
+		wwwWikiRootDir, wikiNames = listWikis(cfg)
 		wiki = cmdArgs[0]
-		if wiki not in wikis:
+		if wiki not in wikiNames:
 			raise Exception("No such Wiki: \"" + wiki + "\"")
 
 		# ----
@@ -522,14 +542,14 @@ try:
 			log.notice(wiki + ": Already running")
 		else:
 			h.startCronScript(log.descend(wiki + ": Starting ..."))
-			waitForService(h.getCronProcesses, wiki, log)
+			waitForServiceStarted(h.getCronProcesses, wiki, log)
 
 	# ----------------------------------------------------------------
 
 	elif cmdName == "start":
-		wwwWikiRootDir, wikis = listWikis(cfg)
+		wwwWikiRootDir, wikiNames = listWikis(cfg)
 		wiki = cmdArgs[0]
-		if wiki not in wikis:
+		if wiki not in wikiNames:
 			raise Exception("No such Wiki: \"" + wiki + "\"")
 
 		startNGINXScriptPath, startPHPFPMScriptPath = getHttpdCfg(cfg)
@@ -542,14 +562,14 @@ try:
 			log.notice("Local NGINX: Already running")
 		else:
 			h.startNGINX(log.descend("Local NGINX: Starting ..."))
-			waitForService(h.getNGINXMasterProcesses, "NGINX", log)
+			waitForServiceStarted(h.getNGINXMasterProcesses, "NGINX", log)
 
 		phpPIDs = h.getPHPFPMMasterProcesses()
 		if phpPIDs:
 			log.notice("Local PHP-FPM: Already running")
 		else:
 			h.startPHPFPM(log.descend("Local PHP-FPM: Starting ..."))
-			waitForService(h.getPHPFPMMasterProcesses, "PHP-FPM", log)
+			waitForServiceStarted(h.getPHPFPMMasterProcesses, "PHP-FPM", log)
 
 		# ----
 
@@ -560,14 +580,14 @@ try:
 			log.notice(wiki + ": Already running")
 		else:
 			h.startCronScript(log.descend(wiki + ": Starting ..."))
-			waitForService(h.getCronProcesses, wiki, log)
+			waitForServiceStarted(h.getCronProcesses, wiki, log)
 
 	# ----------------------------------------------------------------
 
 	elif cmdName == "stop":
-		wwwWikiRootDir, wikis = listWikis(cfg)
+		wwwWikiRootDir, wikiNames = listWikis(cfg)
 		wiki = cmdArgs[0]
-		if wiki not in wikis:
+		if wiki not in wikiNames:
 			raise Exception("No such Wiki: \"" + wiki + "\"")
 
 		startNGINXScriptPath, startPHPFPMScriptPath = getHttpdCfg(cfg)
@@ -586,7 +606,7 @@ try:
 		# ----
 
 		allRunningWikis = []
-		for wikiToCheck in wikis:
+		for wikiToCheck in wikiNames:
 			if wikiToCheck != wiki:
 				h = jk_mediawiki.MediaWikiLocalUserInstallationMgr(os.path.join(wwwWikiRootDir, wiki), userName)
 				pidInfos = h.getCronProcesses()
@@ -616,7 +636,7 @@ try:
 
 	elif cmdName == "status":
 		cmd_httpstatus(cfg, log)
-		cmd_wikistatus(cfg, False, log)
+		wrapped_cmd_wikistatus(cfg, False, log)
 		cmd_diskfree(cfg, log)
 		print()
 		sys.exit(0)
@@ -650,8 +670,10 @@ try:
 	else:
 		raise Exception("Implementation Error!")
 
-except Exception as e:
-	log.error(e)
+except jk_logging.ExceptionInChildContextException as ee:
+	pass
+except Exception as ee:
+	log.error(ee)
 	sys.exit(1)
 
 
