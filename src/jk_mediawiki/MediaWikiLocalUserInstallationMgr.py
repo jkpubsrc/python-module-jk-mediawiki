@@ -76,6 +76,8 @@ class MediaWikiLocalUserInstallationMgr(object):
 		mwLocalSettings = jk_mediawiki.MediaWikiLocalSettingsFile()
 		mwLocalSettings.load(dirPath = mediaWikiDirPath)
 
+		#mwLocalSettings.dump()			# DEBUG
+
 		wikiSiteName = mwLocalSettings.getVarValue("wgSitename")
 		if wikiSiteName is None:
 			wikiSiteName = mwLocalSettings.getVarValue("siteName")
@@ -87,7 +89,6 @@ class MediaWikiLocalUserInstallationMgr(object):
 		dbType = mwLocalSettings.getVarValueE("wgDBtype")
 		if dbType == "sqlite":
 			sqliteDataDir = mwLocalSettings.getVarValueE("wgSQLiteDataDir")
-			assert os.path.dirname(sqliteDataDir) == os.path.dirname(mediaWikiDirPath)
 			self.__wikiDBDirPath = sqliteDataDir
 		else:
 			raise NotImplementedError("Backup of database not (yet) supported: " + dbType)

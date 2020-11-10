@@ -159,11 +159,17 @@ class MediaWikiLocalSettingsVariableAssignment(object):
 		bIsActive = dataMap["active"]
 		varName = dataMap["varName"]
 		varType = dataMap["varType"]
-		assert (varType == "value") or (varType == "array")
+		assert varType in [ "value", "array", "parentDirValue", "fileValue", "dirValue" ]
 		value = dataMap.get("value", None)
 		if value is None:
 			if varType == "array":
 				value = []
+			elif varType == "fileValue":
+				value = TypedValue("magic", "__FILE__")
+			elif varType == "dirValue":
+				value = TypedValue("magic", "__DIR__")
+			elif varType == "parentDirValue":
+				value = TypedValue("magic", "dirname(__DIR__)")
 			else:
 				assert value != None
 		varIndexList = dataMap.get("index", None)

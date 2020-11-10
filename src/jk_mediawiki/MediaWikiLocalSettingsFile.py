@@ -97,6 +97,10 @@ class MediaWikiLocalSettingsFile(object):
 		TokenPattern("semicolon"),
 	])
 
+	# $someVar = value
+	# $someVar[value] = value
+	# $someVar = array(value)
+	# $someVar[value] = array(value)
 	__STMT_VARIABLE_ASSIGNMENT = TokenPatternSequence([
 		TokenPatternOptional(TokenPatternSequence([
 			TokenPattern("commentx").setTag("active", False),
@@ -121,6 +125,38 @@ class MediaWikiLocalSettingsFile(object):
 				TokenPattern("lparen1"),
 				__OPTIONAL_SPACE_OR_NEWLINE,
 				TokenPatternOptional(__VALUE_LIST_PATTERN),
+				__OPTIONAL_SPACE_OR_NEWLINE,
+				TokenPattern("rparen1"),
+				__OPTIONAL_SPACE_OR_NEWLINE,
+			]),
+			TokenPatternSequence([
+				TokenPattern("word", "dirname"),
+				__OPTIONAL_SPACE_OR_NEWLINE,
+				TokenPattern("word", "__DIR__").setTag("varType", "dirValue"),
+				__OPTIONAL_SPACE_OR_NEWLINE,
+			]),
+			TokenPatternSequence([
+				TokenPattern("word", "dirname"),
+				__OPTIONAL_SPACE_OR_NEWLINE,
+				TokenPattern("word", "__FILE__").setTag("varType", "fileValue"),
+				__OPTIONAL_SPACE_OR_NEWLINE,
+			]),
+			TokenPatternSequence([
+				TokenPattern("word", "dirname"),
+				__OPTIONAL_SPACE_OR_NEWLINE,
+				TokenPattern("lparen1"),
+				__OPTIONAL_SPACE_OR_NEWLINE,
+				TokenPattern("word", "__FILE__").setTag("varType", "dirValue"),
+				__OPTIONAL_SPACE_OR_NEWLINE,
+				TokenPattern("rparen1"),
+				__OPTIONAL_SPACE_OR_NEWLINE,
+			]),
+			TokenPatternSequence([
+				TokenPattern("word", "dirname"),
+				__OPTIONAL_SPACE_OR_NEWLINE,
+				TokenPattern("lparen1"),
+				__OPTIONAL_SPACE_OR_NEWLINE,
+				TokenPattern("word", "__DIR__").setTag("varType", "parentDirValue"),
 				__OPTIONAL_SPACE_OR_NEWLINE,
 				TokenPattern("rparen1"),
 				__OPTIONAL_SPACE_OR_NEWLINE,
@@ -167,6 +203,7 @@ class MediaWikiLocalSettingsFile(object):
 		self.__data = None
 		self.__changedFlag = ChangedFlag(False)
 		self.__filePath = None
+		self.__magicVarValues = None
 	#
 
 
@@ -275,7 +312,15 @@ class MediaWikiLocalSettingsFile(object):
 		else:
 			raise Exception("At least one of the following arguments must be specified: 'rawText' or 'filePath'!")
 
+		self.__magicVarValues = {
+			"__FILE__": filePath,
+			"__DIR__": dirPath,
+			"dirname(__DIR__)": os.path.dirname(dirPath),
+		}
+
 		tokens = list(PHPTokenizer().tokenize(rawText, bEmitWhiteSpaces = True, bEmitComments = True, bEmitNewLines = True))
+		#for t in tokens:
+		#	print(t)
 
 		# resultDataList will receive 2-tuples where
 		# the first item indicates the entry type - either "arrayAppend", "varAssignComplex", "varAssign" or "other" - and
@@ -288,30 +333,42 @@ class MediaWikiLocalSettingsFile(object):
 				assert n > 0
 				# interpret pattern encountered and store it
 				resultDataList.append( ( "arrayAppend", MediaWikiLocalSettingsArrayAppend.parseFromDict(self.__changedFlag, data) ) )
+				#print("--arrayAppend--")				# DEBUG
+				#for i in range(0, n):					# DEBUG
+				#	print("\t", tokens[pos+i])			# DEBUG
+
 				# advance
 				pos += n
+				continue
 
-			else:
-				(bResult, n, data) = MediaWikiLocalSettingsFile.__STMT_VARIABLE_ASSIGNMENT.tryMatch(tokens, pos, MediaWikiLocalSettingsFile.__PARSING_DEFAULTS)
-				if bResult:
-					assert n > 0
-					# interpret pattern encountered and store it
-					resultDataList.append( ( "varAssign", MediaWikiLocalSettingsVariableAssignment.parseFromDict(self.__changedFlag, data) ) )
-					# advance
-					pos += n
+			(bResult, n, data) = MediaWikiLocalSettingsFile.__STMT_VARIABLE_ASSIGNMENT.tryMatch(tokens, pos, MediaWikiLocalSettingsFile.__PARSING_DEFAULTS)
+			if bResult:
+				assert n > 0
+				# interpret pattern encountered and store it
+				resultDataList.append( ( "varAssign", MediaWikiLocalSettingsVariableAssignment.parseFromDict(self.__changedFlag, data) ) )
+				#print("--varAssign--")					# DEBUG
+				#for i in range(0, n):					# DEBUG
+				#	print("\t", tokens[pos+i])			# DEBUG
 
-				else:
-					(bResult, n, data) = MediaWikiLocalSettingsFile.__STMT_VARIABLE_ASSIGNMENT_2.tryMatch(tokens, pos, MediaWikiLocalSettingsFile.__PARSING_DEFAULTS)
-					if bResult:
-						assert n > 0
-						# interpret pattern encountered and store it
-						resultDataList.append( ( "varAssignComplex", MediaWikiLocalSettingsComplexVariableAssignment.parseFromDict(self.__changedFlag, data) ) )
-						# advance
-						pos += n
+				# advance
+				pos += n
+				continue
 
-					else:
-						resultDataList.append( ( "other", tokens[pos] ) )
-						pos += 1
+			(bResult, n, data) = MediaWikiLocalSettingsFile.__STMT_VARIABLE_ASSIGNMENT_2.tryMatch(tokens, pos, MediaWikiLocalSettingsFile.__PARSING_DEFAULTS)
+			if bResult:
+				assert n > 0
+				# interpret pattern encountered and store it
+				resultDataList.append( ( "varAssignComplex", MediaWikiLocalSettingsComplexVariableAssignment.parseFromDict(self.__changedFlag, data) ) )
+				#print("--varAssignComplex--")				# DEBUG
+				#for i in range(0, n):					# DEBUG
+				#	print("\t", tokens[pos+i])			# DEBUG
+
+				# advance
+				pos += n
+				continue
+
+			resultDataList.append( ( "other", tokens[pos] ) )
+			pos += 1
 
 		#for b, t in resultDataList:
 		#	print(str(b) + "\t\t" + str(t))
@@ -408,6 +465,12 @@ class MediaWikiLocalSettingsFile(object):
 
 
 
+	#
+	# Get a variable value.
+	# This method will resolve the value: If it contains magic constants or simple expressions the syntax will be evaluated and the resulting value returned.
+	#
+	# @return		value			This data or <c>None</c> if the variable does not exist.
+	#
 	def getVarValue(self, varName:str):
 		assert isinstance(varName, str)
 
@@ -417,10 +480,14 @@ class MediaWikiLocalSettingsFile(object):
 				# type: MediaWikiLocalSettingsComplexVariableAssignment
 				return item.getValue(self.getVarValueE)
 			else:
-				# type: TypeValue, MediaWikiLocalSetttingsVariableAssignment, MediaWikiLocalSettingsArrayAppend
+				# type: TypeValue, MediaWikiLocalSettingsVariableAssignment, MediaWikiLocalSettingsArrayAppend
 				v = item.value
 				if isinstance(v, TypedValue):
-					return v.value
+					if v.dataType == "magic":
+						# this is a "magic" variable. return the replacement value.
+						return self.__magicVarValues[v.value]
+					else:
+						return v.value
 				elif isinstance(v, list):
 					ret = []
 					for d in v:
@@ -435,13 +502,10 @@ class MediaWikiLocalSettingsFile(object):
 
 
 	#
-	# Get a variable-like object.
+	# Get a variable value.
+	# This method will resolve the value: If it contains magic constants or simple expressions the syntax will be evaluated and the resulting value returned.
 	#
-	# @return		someObject			This object returned is either of type:
-	#									* TypeValue - if it is a constant
-	#									* MediaWikiLocalSetttingsVariableAssignment - if it is a constant assigned to a variable
-	#									* MediaWikiLocalSetttingsComplexVariableAssignment - if it is a complex variable assignment
-	#									* MediaWikiLocalSettingsArrayAppend - if it is a value appended to an array
+	# @return		value			This data.
 	#
 	def getVarValueE(self, varName:str):
 		assert isinstance(varName, str)
@@ -460,8 +524,8 @@ class MediaWikiLocalSettingsFile(object):
 	#
 	# @return		someObject			This object returned is either of type:
 	#									* TypeValue - if it is a constant
-	#									* MediaWikiLocalSetttingsVariableAssignment - if it is a constant assigned to a variable
-	#									* MediaWikiLocalSetttingsComplexVariableAssignment - if it is a complex variable assignment
+	#									* MediaWikiLocalSettingsVariableAssignment - if it is a constant assigned to a variable
+	#									* MediaWikiLocalSettingsComplexVariableAssignment - if it is a complex variable assignment
 	#									* MediaWikiLocalSettingsArrayAppend - if it is a value appended to an array
 	#
 	def getVar(self, varName:str):

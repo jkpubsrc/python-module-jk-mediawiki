@@ -1,4 +1,4 @@
-﻿jk_mediawiki
+jk_mediawiki
 ============
 
 Introduction

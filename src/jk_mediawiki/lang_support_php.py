@@ -33,6 +33,8 @@ def tokenValueToPHP(dataType:str, value):
 		return value
 	elif dataType == "word":
 		return value
+	elif dataType == "magic":
+		return value
 	else:
 		raise Exception("Implementation Error! (" + repr(dataType) + ", " + repr(value) + ")")
 #

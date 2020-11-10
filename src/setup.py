@@ -21,9 +21,9 @@ setup(
 	classifiers = [
 		"Development Status :: 4 - Beta",
 		"License :: OSI Approved :: Apache Software License",
+		"Programming Language :: Python :: 3",
 	],
 	description = "This module provides functions, classes and binaries to assist in working with MediaWiki installations.",
-	download_url = "https://github.com/jkpubsrc/python-module-jk-mediawiki/tarball/0.2020.6.8",
 	include_package_data = False,
 	install_requires = [
 		"jk_utils",
@@ -34,7 +34,7 @@ setup(
 		"mw",
 		"php",
 	],
-	license = "Apache 2.0",
+	license = "Apache2",
 	name = "jk_mediawiki",
 	packages = [
 		"jk_mediawiki",
@@ -42,8 +42,7 @@ setup(
 	scripts = [
 		"bin/wikilocalctrl.py",
 	],
-	url = "https://github.com/jkpubsrc/python-module-jk-mediawiki",
-	version = "0.2020.8.17",
+	version = "0.2020.11.10",
 	zip_safe = False,
 	long_description = readme(),
 	long_description_content_type="text/markdown",
