@@ -657,7 +657,6 @@ try:
 		print()
 		sys.exit(0)
 
-
 	# ----------------------------------------------------------------
 
 	elif cmdName == "extensionmatrix":
