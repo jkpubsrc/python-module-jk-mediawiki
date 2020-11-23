@@ -359,7 +359,7 @@ class MediaWikiLocalSettingsFile(object):
 				assert n > 0
 				# interpret pattern encountered and store it
 				resultDataList.append( ( "varAssignComplex", MediaWikiLocalSettingsComplexVariableAssignment.parseFromDict(self.__changedFlag, data) ) )
-				#print("--varAssignComplex--")				# DEBUG
+				#print("--varAssignComplex--")			# DEBUG
 				#for i in range(0, n):					# DEBUG
 				#	print("\t", tokens[pos+i])			# DEBUG
 

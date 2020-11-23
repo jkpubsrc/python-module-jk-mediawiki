@@ -13,6 +13,7 @@ import jk_logging
 from jk_typing import *
 import jk_version
 
+from .Utils import Utils
 from .MediaWikiDiskUsageInfo import MediaWikiDiskUsageInfo
 from .MediaWikiExtensionInfo import MediaWikiExtensionInfo
 
@@ -263,7 +264,7 @@ class MediaWikiLocalUserInstallationMgr(object):
 		raise Exception("Can't determine version!")
 	#
 
-	def getSMWVersion(self) -> jk_version.Version:
+	def getSMWVersion(self) -> typing.Union[jk_version.Version,None]:
 		p = os.path.join(self.__wikiDirPath, "extensions", "SemanticMediaWiki", "extension.json")
 		if os.path.isfile(p):
 			j = jk_json.loadFromFile(p)
@@ -330,80 +331,51 @@ class MediaWikiLocalUserInstallationMgr(object):
 			return datetime.datetime.fromtimestamp(mtime)
 	#
 
-	def __getDiskSpaceNonRecursively(self, dirPath:str):
-		ret = 0
-		for fe in os.scandir(dirPath):
-			if fe.is_symlink():
-				continue
-			elif fe.is_file():
-				n = fe.stat().st_size
-				ret += int(math.ceil(n / 4096) * 4096)
-		return ret
 	#
-
-	def __getDiskSpaceRecursively(self, dirPath:str):
-		ret = 0
-		for fe in os.scandir(dirPath):
-			if fe.is_symlink():
-				continue
-			elif fe.is_file():
-				n = fe.stat().st_size
-				ret += int(math.ceil(n / 4096) * 4096)
-			elif fe.is_dir():
-				ret += self.__getDiskSpaceRecursively(fe.path)
-		return ret
+	# This method is a generator that returns information about extensions available in the MediaWiki extension directory.
 	#
-
-	def __getLatestUseTimeStampRecursively(self, dirPath:str):
-		t = 0
-		for fe in os.scandir(dirPath):
-			if fe.is_symlink():
-				continue
-			elif fe.is_file():
-				mtime = fe.stat(follow_symlinks=False).st_mtime
-				if mtime > t:
-					t = mtime
-			elif fe.is_dir():
-				mtime = self.__getLatestUseTimeStampRecursively(fe.path)
-				if mtime > t:
-					t = mtime
-		return t
+	# @param			jk_logging.AbstractLogger log			(optional) A logger for debug output; if you run into problems loading and analyzing
+	#															an extention (yes, that happens, as extensions might have errors) specify a debug logger
+	#															here, as all analyzing is done immediately on calling this method;
+	# @return			MediaWikiExtensionInfo[]				Yields extension information objects.
+	#															Please note that versions in extension information objects are currently strings
+	#															as some extensions use a completely non-standard, off the limit versioning schema.
+	#															(This situation might change in the future.)
 	#
-
-	def getExtensionInfos(self):
+	def getExtensionInfos(self, log:jk_logging.AbstractLogger = None):
 		for fe in os.scandir(self.wikiExtensionsDirPath):
 			if fe.is_symlink() or not fe.is_dir():
 				continue
 			extensionDirPath = fe.path
-
 			name = fe.name
 
-			version = None
-
-			size = self.__getDiskSpaceRecursively(extensionDirPath)
-
-			t = self.__getLatestUseTimeStampRecursively(extensionDirPath)
-
-			if t <= 0:
-				dt = None
+			if log:
+				with log.descend("Analyzing: " + name) as log2:
+					ex = self.__getExtensionInfo(name, extensionDirPath)
 			else:
-				dt = datetime.datetime.fromtimestamp(t)
+				ex = self.__getExtensionInfo(name, extensionDirPath)
 
-			extensionJSONFilePath = os.path.join(extensionDirPath, "extension.json")
-			if os.path.isfile(extensionJSONFilePath):
-				jDict = jk_json.loadFromFile(extensionJSONFilePath)
-				name = jDict["name"]
-				if "version" in jDict:
-					version = jDict["version"]
+			yield ex
+	#
 
-			yield MediaWikiExtensionInfo(fe.name, version, size, dt)
+	def __getExtensionInfo(self, name:str, extensionDirPath:str) -> MediaWikiExtensionInfo:
+		version = None
+
+		extensionJSONFilePath = os.path.join(extensionDirPath, "extension.json")
+		if os.path.isfile(extensionJSONFilePath):
+			jDict = jk_json.loadFromFile(extensionJSONFilePath)
+			name = jDict["name"]
+			if "version" in jDict:
+				version = jDict["version"]
+
+		return MediaWikiExtensionInfo(extensionDirPath, name, version)
 	#
 
 	def getDiskUsage(self) -> MediaWikiDiskUsageInfo:
-		sizeCache = self.__getDiskSpaceRecursively(os.path.join(self.__wikiDirPath, "cache"))
-		sizeImages = self.__getDiskSpaceRecursively(os.path.join(self.__wikiDirPath, "images"))
-		sizeExtensions = self.__getDiskSpaceRecursively(os.path.join(self.__wikiDirPath, "extensions"))
-		sizeDatabase = self.__getDiskSpaceRecursively(self.__wikiDBDirPath)
+		sizeCache = Utils.getDiskSpaceRecursively(os.path.join(self.__wikiDirPath, "cache"))
+		sizeImages = Utils.getDiskSpaceRecursively(os.path.join(self.__wikiDirPath, "images"))
+		sizeExtensions = Utils.getDiskSpaceRecursively(os.path.join(self.__wikiDirPath, "extensions"))
+		sizeDatabase = Utils.getDiskSpaceRecursively(self.__wikiDBDirPath)
 
 		sizeCore = 0
 		for fe in os.scandir(self.__wikiDirPath):
@@ -413,7 +385,7 @@ class MediaWikiLocalUserInstallationMgr(object):
 				n = fe.stat().st_size
 				sizeCore += int(math.ceil(n / 4096) * 4096)
 			elif fe.is_dir() and fe.name not in [ "images", "cache", "extensions" ]:
-				sizeCore += self.__getDiskSpaceRecursively(fe.path)
+				sizeCore += Utils.getDiskSpaceRecursively(fe.path)
 
 		return MediaWikiDiskUsageInfo(sizeCore, sizeCache, sizeImages, sizeExtensions, sizeDatabase)
 	#

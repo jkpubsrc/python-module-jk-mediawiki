@@ -151,6 +151,8 @@ def listWikis(cfg:dict) -> typing.Tuple[str,typing.List[str]]:
 # @param		dict cfg			The content of the user specific configuration file "~/.config/wikilocalctrl.json"
 #
 def cmd_httpstatus(cfg:dict, log):
+	pids = []
+
 	startNGINXScriptPath, startPHPFPMScriptPath = getHttpdCfg(cfg)
 	h = jk_mediawiki.MediaWikiLocalUserServiceMgr(startNGINXScriptPath, startPHPFPMScriptPath, userName)
 
@@ -161,6 +163,7 @@ def cmd_httpstatus(cfg:dict, log):
 	nginxPIDs = h.getNGINXMasterProcesses()
 	c = jk_console.Console.ForeGround.STD_GREEN if nginxPIDs else jk_console.Console.ForeGround.STD_DARKGRAY
 	if nginxPIDs:
+		pids.extend(nginxPIDs)
 		t.addRow("Local NGINX", "running", str([ x["pid"] for x in nginxPIDs ])).color = c
 	else:
 		t.addRow("Local NGINX", "stopped", "-").color = c
@@ -168,12 +171,15 @@ def cmd_httpstatus(cfg:dict, log):
 	phpPIDs = h.getPHPFPMMasterProcesses()
 	c = jk_console.Console.ForeGround.STD_GREEN if phpPIDs else jk_console.Console.ForeGround.STD_DARKGRAY
 	if phpPIDs:
+		pids.extend(phpPIDs)
 		t.addRow("Local PHP-FPM", "running", str([ x["pid"] for x in phpPIDs ])).color = c
 	else:
 		t.addRow("Local PHP-FPM", "stopped", "-").color = c
 
 	print()
 	t.print()
+
+	return pids
 #
 
 
@@ -196,11 +202,24 @@ def wrapped_cmd_wikistatus(cfg:dict, bWithDiskSpace:bool, log):
 		raise
 #
 
+def print_mem_used_by_pids(pids:list):
+	pids = set(pids)
+	totalMemKB = 0
+	for jStruct in jk_sysinfo.get_ps():
+		if jStruct["pid"] in pids:
+			totalMemKB += jStruct["vmsizeKB"]
+
+	print()
+	print("Total memory used: " + _formatMBytes(totalMemKB/1024))
+#
+
 #
 # @param	dict cfg			The content of the user specific configuration file "~/.config/wikilocalctrl.json"
 #
 def cmd_wikistatus(cfg:dict, bWithDiskSpace:bool, log):
 	wwwWikiRootDir, wikiNames = listWikis(cfg)
+
+	pids = []
 
 	t = jk_console.SimpleTable()
 	rowData = [ "Wiki", "MW Version", "SMW Version", "Status", "Last configuration", "Last use", "Cron Script Processes" ]
@@ -218,6 +237,7 @@ def cmd_wikistatus(cfg:dict, bWithDiskSpace:bool, log):
 			smVersion = h.getSMWVersion()
 			lastCfgTime = h.getLastConfigurationTimeStamp()
 			lastUseTime = h.getLastUseTimeStamp()
+			pids = h.getCronProcesses()
 			rowData = [
 				wiki,
 				str(h.getVersion()),
@@ -225,8 +245,10 @@ def cmd_wikistatus(cfg:dict, bWithDiskSpace:bool, log):
 				"running" if bIsRunning else "stopped",
 				lastCfgTime.strftime("%Y-%m-%d %H:%M") if lastCfgTime else "-",
 				lastUseTime.strftime("%Y-%m-%d %H:%M") if lastUseTime else "-",
-				str([ x["pid"] for x in h.getCronProcesses() ]) if bIsRunning else "-",
+				str([ x["pid"] for x in pids ]) if bIsRunning else "-",
 			]
+			if pids:
+				pids.extend(pids)
 			if bWithDiskSpace:
 				diskUsage = h.getDiskUsage()
 				rowData.append(_formatMBytes(diskUsage.ro / 1048576))
@@ -235,6 +257,8 @@ def cmd_wikistatus(cfg:dict, bWithDiskSpace:bool, log):
 
 	print()
 	t.print()
+
+	return pids
 #
 
 
@@ -635,8 +659,12 @@ try:
 	# ----------------------------------------------------------------
 
 	elif cmdName == "status":
-		cmd_httpstatus(cfg, log)
-		wrapped_cmd_wikistatus(cfg, False, log)
+		pids1 = cmd_httpstatus(cfg, log)
+		pids2 = wrapped_cmd_wikistatus(cfg, False, log)
+
+		pids = pids1 + pids2
+		print_mem_used_by_pids(pids)
+
 		cmd_diskfree(cfg, log)
 		print()
 		sys.exit(0)
