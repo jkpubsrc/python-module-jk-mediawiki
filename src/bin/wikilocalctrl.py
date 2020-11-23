@@ -150,7 +150,7 @@ def listWikis(cfg:dict) -> typing.Tuple[str,typing.List[str]]:
 #
 # @param		dict cfg			The content of the user specific configuration file "~/.config/wikilocalctrl.json"
 #
-def cmd_httpstatus(cfg:dict, log):
+def cmd_httpstatus(cfg:dict, log) -> list:
 	pids = []
 
 	startNGINXScriptPath, startPHPFPMScriptPath = getHttpdCfg(cfg)
@@ -193,10 +193,10 @@ def _formatMBytes(n:int) -> str:
 	return s
 #
 
-def wrapped_cmd_wikistatus(cfg:dict, bWithDiskSpace:bool, log):
+def wrapped_cmd_wikistatus(cfg:dict, bWithDiskSpace:bool, log) -> list:
 	blog = jk_logging.BufferLogger.create()
 	try:
-		cmd_wikistatus(cfg, bWithDiskSpace, blog)
+		return cmd_wikistatus(cfg, bWithDiskSpace, blog)
 	except jk_logging.ExceptionInChildContextException as ee:
 		blog.forwardTo(log)
 		raise
@@ -216,7 +216,7 @@ def print_mem_used_by_pids(pids:list):
 #
 # @param	dict cfg			The content of the user specific configuration file "~/.config/wikilocalctrl.json"
 #
-def cmd_wikistatus(cfg:dict, bWithDiskSpace:bool, log):
+def cmd_wikistatus(cfg:dict, bWithDiskSpace:bool, log) -> list:
 	wwwWikiRootDir, wikiNames = listWikis(cfg)
 
 	pids = []
