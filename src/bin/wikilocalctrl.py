@@ -163,7 +163,7 @@ def cmd_httpstatus(cfg:dict, log) -> list:
 	nginxPIDs = h.getNGINXMasterProcesses()
 	c = jk_console.Console.ForeGround.STD_GREEN if nginxPIDs else jk_console.Console.ForeGround.STD_DARKGRAY
 	if nginxPIDs:
-		pids.extend(nginxPIDs)
+		pids.extend([ x["pid"] for x in nginxPIDs ])
 		t.addRow("Local NGINX", "running", str([ x["pid"] for x in nginxPIDs ])).color = c
 	else:
 		t.addRow("Local NGINX", "stopped", "-").color = c
@@ -171,7 +171,7 @@ def cmd_httpstatus(cfg:dict, log) -> list:
 	phpPIDs = h.getPHPFPMMasterProcesses()
 	c = jk_console.Console.ForeGround.STD_GREEN if phpPIDs else jk_console.Console.ForeGround.STD_DARKGRAY
 	if phpPIDs:
-		pids.extend(phpPIDs)
+		pids.extend([ x["pid"] for x in phpPIDs ])
 		t.addRow("Local PHP-FPM", "running", str([ x["pid"] for x in phpPIDs ])).color = c
 	else:
 		t.addRow("Local PHP-FPM", "stopped", "-").color = c
@@ -207,10 +207,11 @@ def print_mem_used_by_pids(pids:list):
 	totalMemKB = 0
 	for jStruct in jk_sysinfo.get_ps():
 		if jStruct["pid"] in pids:
-			totalMemKB += jStruct["vmsizeKB"]
+			if "vmsizeKB" in jStruct:
+				totalMemKB += jStruct["vmsizeKB"]
 
 	print()
-	print("Total memory used: " + _formatMBytes(totalMemKB/1024))
+	print("Total memory used: " + (_formatMBytes(totalMemKB/1024) if totalMemKB else "???"))
 #
 
 #
@@ -237,7 +238,10 @@ def cmd_wikistatus(cfg:dict, bWithDiskSpace:bool, log) -> list:
 			smVersion = h.getSMWVersion()
 			lastCfgTime = h.getLastConfigurationTimeStamp()
 			lastUseTime = h.getLastUseTimeStamp()
-			pids = h.getCronProcesses()
+			processInfos = h.getCronProcesses()
+			if processInfos:
+				processPIDs = [ x["pid"] for x in processInfos ]
+				pids.extend(processPIDs)
 			rowData = [
 				wiki,
 				str(h.getVersion()),
@@ -245,7 +249,7 @@ def cmd_wikistatus(cfg:dict, bWithDiskSpace:bool, log) -> list:
 				"running" if bIsRunning else "stopped",
 				lastCfgTime.strftime("%Y-%m-%d %H:%M") if lastCfgTime else "-",
 				lastUseTime.strftime("%Y-%m-%d %H:%M") if lastUseTime else "-",
-				str([ x["pid"] for x in pids ]) if bIsRunning else "-",
+				str(processPIDs) if bIsRunning else "-",
 			]
 			if pids:
 				pids.extend(pids)
@@ -660,9 +664,13 @@ try:
 
 	elif cmdName == "status":
 		pids1 = cmd_httpstatus(cfg, log)
+		assert isinstance(pids1, list)
 		pids2 = wrapped_cmd_wikistatus(cfg, False, log)
+		assert isinstance(pids2, list)
 
-		pids = pids1 + pids2
+		pids = []
+		pids.extend(pids1)
+		pids.extend(pids2)
 		print_mem_used_by_pids(pids)
 
 		cmd_diskfree(cfg, log)
