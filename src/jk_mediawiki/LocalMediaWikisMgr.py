@@ -175,11 +175,14 @@ class LocalMediaWikisMgr(object):
 		for i, wikiName in enumerate(wikiNames):
 			with log.descend("Scanning: {}".format(wikiName)) as log2:
 				try:
-					extInfos = []
-					for extInfo in wikis[i].getExtensionInfos():
-						if self.__bVerbose:
-							log2.notice("Succeeded: " + extInfo.name)
-						extInfos.append(extInfo)
+					if self.__bVerbose:
+						extInfos = []
+						for extInfo in wikis[i].getExtensionInfos(log2):
+							if self.__bVerbose:
+								log2.notice("Succeeded: " + extInfo.name)
+							extInfos.append(extInfo)
+					else:
+						extInfos = list(wikis[i].getExtensionInfos())
 				except Exception as ee:
 					log2.error(ee)
 					log2.error("Stopping scanning for {} because of errors.".format(wikiName))
