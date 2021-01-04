@@ -31,6 +31,7 @@ ap.setLicense("apache")
 # set defaults
 
 ap.optionDataDefaults.set("bShowHelp", False)
+ap.optionDataDefaults.set("bVerbose", False)
 ap.optionDataDefaults.set("bShowVersion", False)
 ap.optionDataDefaults.set("wwwWikiRootDir", None)
 ap.optionDataDefaults.set("httpBinDir", None)
@@ -41,6 +42,8 @@ ap.createOption('h', 'help', "Display this help text and then exit.").onOption =
 	lambda argOption, argOptionArguments, parsedArgs: parsedArgs.optionData.set("bShowHelp", True)
 ap.createOption(None, 'version', "Display the version of this software and then exit.").onOption = \
 	lambda argOption, argOptionArguments, parsedArgs: parsedArgs.optionData.set("bShowVersion", True)
+ap.createOption(None, 'verbose', "Specify this option for more log output (for debugging purposes).").onOption = \
+	lambda argOption, argOptionArguments, parsedArgs: parsedArgs.optionData.set("bVerbose", True)
 ap.createOption('w', 'wwwwikirootdir', "The root directory for the local wiki installations.").onOption = \
 	lambda argOption, argOptionArguments, parsedArgs: parsedArgs.optionData.set("wwwWikiRootDir", True)
 ap.createOption('d', 'httpbindir', "The root directory for the web server start script(s).").onOption = \
@@ -77,7 +80,7 @@ ap.createCommand("extensionmatrix", "Display a matrix about all wiki extensions.
 @jk_typing.checkFunctionSignature()
 def getHttpdCfg(cfg:dict):
 	if cfg["httpBinDir"] is None:
-		raise Exception("Missing configuration: 'httpBinDir'")
+		raise Exception("Missing configuration key: 'httpBinDir'")
 	startNGINXScriptPath = os.path.join(cfg["httpBinDir"], "start-nginx-bg.sh")
 	if not os.path.isfile(startNGINXScriptPath):
 		raise Exception("Missing script: \"start-nginx-bg.sh\"")
@@ -385,17 +388,8 @@ def cmd_extensionmatrix(cfg:dict, log):
 
 
 
-log = jk_logging.ConsoleLogger.create(logMsgFormatter=jk_logging.COLOR_LOG_MESSAGE_FORMATTER)
+with jk_logging.wrapMain() as log:
 
-
-
-
-
-
-
-
-#MediaWikiLocalUserServiceMgr
-try:
 	parsedArgs = ap.parse()
 
 	if parsedArgs.optionData["bShowVersion"]:
@@ -410,15 +404,20 @@ try:
 		ap.showHelp()
 		sys.exit(1)
 
+	bVerbose = parsedArgs.optionData["bVerbose"]
+
 	# load configuration: merge it with specified arguments
 
 	userName = getpass.getuser()
 	homeDir = os.environ["HOME"]
 	cfgPath = os.path.join(homeDir, ".config/wikilocalctrl.json")
 	if os.path.isfile(cfgPath):
+		if bVerbose:
+			log.notice("Loading: " + cfgPath)
 		cfg = jk_json.loadFromFile(cfgPath)
 	else:
 		raise Exception("No configuration file: '~/.config/wikilocalctrl.json'")
+	log.notice("Verifying configuration ...")
 	for key in [ "wwwWikiRootDir", "httpBinDir" ]:
 		if (key in parsedArgs.optionData) and (parsedArgs.optionData[key] is not None):
 			cfg[key] = parsedArgs.optionData[key]
@@ -705,11 +704,6 @@ try:
 	else:
 		raise Exception("Implementation Error!")
 
-except jk_logging.ExceptionInChildContextException as ee:
-	pass
-except Exception as ee:
-	log.error(ee)
-	sys.exit(1)
 
 
 
