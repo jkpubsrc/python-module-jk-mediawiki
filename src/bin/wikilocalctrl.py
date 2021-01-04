@@ -196,15 +196,6 @@ def _formatMBytes(n:int) -> str:
 	return s
 #
 
-def wrapped_cmd_wikistatus(cfg:dict, bWithDiskSpace:bool, log) -> list:
-	blog = jk_logging.BufferLogger.create()
-	try:
-		return cmd_wikistatus(cfg, bWithDiskSpace, blog)
-	except jk_logging.ExceptionInChildContextException as ee:
-		blog.forwardTo(log)
-		raise
-#
-
 def print_mem_used_by_pids(pids:list):
 	pids = set(pids)
 	totalMemKB = 0
@@ -217,56 +208,6 @@ def print_mem_used_by_pids(pids:list):
 	print("Total memory used: " + (_formatMBytes(totalMemKB/1024) if totalMemKB else "???"))
 #
 
-#
-# @param	dict cfg			The content of the user specific configuration file "~/.config/wikilocalctrl.json"
-#
-def cmd_wikistatus(cfg:dict, bWithDiskSpace:bool, log) -> list:
-	wwwWikiRootDir, wikiNames = listWikis(cfg)
-
-	pids = []
-
-	t = jk_console.SimpleTable()
-	rowData = [ "Wiki", "MW Version", "SMW Version", "Status", "Last configuration", "Last use", "Cron Script Processes" ]
-	if bWithDiskSpace:
-		rowData.append("SizeRO")
-		rowData.append("SizeRW")
-	t.addRow(*rowData).hlineAfterRow = True
-	r = jk_console.Console.RESET
-
-	for wiki in wikiNames:
-		with log.descend("Checking wiki: " + wiki) as log2:
-			h = jk_mediawiki.MediaWikiLocalUserInstallationMgr(os.path.join(wwwWikiRootDir, wiki), userName)
-			bIsRunning = h.isCronScriptRunning()
-			c = jk_console.Console.ForeGround.STD_GREEN if bIsRunning else jk_console.Console.ForeGround.STD_DARKGRAY
-			smVersion = h.getSMWVersion()
-			lastCfgTime = h.getLastConfigurationTimeStamp()
-			lastUseTime = h.getLastUseTimeStamp()
-			processInfos = h.getCronProcesses()
-			if processInfos:
-				processPIDs = [ x["pid"] for x in processInfos ]
-				pids.extend(processPIDs)
-			rowData = [
-				wiki,
-				str(h.getVersion()),
-				str(smVersion) if smVersion else "-",
-				"running" if bIsRunning else "stopped",
-				lastCfgTime.strftime("%Y-%m-%d %H:%M") if lastCfgTime else "-",
-				lastUseTime.strftime("%Y-%m-%d %H:%M") if lastUseTime else "-",
-				str(processPIDs) if bIsRunning else "-",
-			]
-			if pids:
-				pids.extend(pids)
-			if bWithDiskSpace:
-				diskUsage = h.getDiskUsage()
-				rowData.append(_formatMBytes(diskUsage.ro / 1048576))
-				rowData.append(_formatMBytes(diskUsage.rw / 1048576))
-			t.addRow(*rowData).color = c
-
-	print()
-	t.print()
-
-	return pids
-#
 
 
 
@@ -678,9 +619,6 @@ with jk_logging.wrapMain() as log:
 		r.table.print()
 		print()
 
-		#pids2 = wrapped_cmd_wikistatus(cfg, False, log)
-		#assert isinstance(pids2, list)
-
 		pids = []
 		pids.extend(pids1)
 		pids.extend(r.pids)
@@ -715,8 +653,12 @@ with jk_logging.wrapMain() as log:
 	# ----------------------------------------------------------------
 
 	elif cmdName == "extensionmatrix":
-		cmd_extensionmatrix(cfg, log)
+		table = localMediaWikisMgr.getExtensionMatrix(log)
+
 		print()
+		table.print()
+		print()
+
 		sys.exit(0)
 
 	# ----------------------------------------------------------------
