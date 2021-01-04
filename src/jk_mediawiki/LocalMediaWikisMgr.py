@@ -112,7 +112,7 @@ class LocalMediaWikisMgr(object):
 	#
 	@jk_typing.checkFunctionSignature()
 	def getStatusOverview(self, bWithDiskSpace:bool, log:jk_logging.AbstractLogger) -> _StatusOverviewResult:
-		wikiNames = listWikis()
+		wikiNames = self.listWikis()
 
 		pids = []
 
