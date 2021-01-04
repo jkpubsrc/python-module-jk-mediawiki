@@ -247,16 +247,18 @@ class LocalMediaWikisMgr(object):
 					maxT2 = maxT
 					maxT = row[_x]
 					maxX = _x
-				if table.row(_y + 2)[_x + 1].value == "err":
-					table.row(_y + 2)[_x + 1].color = jk_console.Console.ForeGround.STD_DARKGRAY
+				cell = table.row(_y + 2)[_x + 1]
+				if cell.value == "err":
+					cell.color = jk_console.Console.ForeGround.STD_RED
 				else:
-					table.row(_y + 2)[_x + 1].color = jk_console.Console.ForeGround.STD_RED
+					cell.color = jk_console.Console.ForeGround.STD_DARKGRAY
 
 			for _x in range(0, len(row)):
+				cell = table.row(_y + 2)[_x + 1]
 				if (maxT > 0) and (row[_x] == maxT):
-					table.row(_y + 2)[_x + 1].color = jk_console.Console.ForeGround.STD_YELLOW
+					cell.color = jk_console.Console.ForeGround.STD_YELLOW
 				elif (maxT2 > 0) and (row[_x] == maxT2):
-					table.row(_y + 2)[_x + 1].color = jk_console.Console.ForeGround.STD_LIGHTGRAY
+					cell.color = jk_console.Console.ForeGround.STD_LIGHTGRAY
 
 		# return table
 
