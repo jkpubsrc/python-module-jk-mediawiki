@@ -58,12 +58,14 @@ class LocalMediaWikisMgr(object):
 	# @param		str wwwWikiRootDir			The directory where all local MediaWiki installations reside.
 	#
 	@jk_typing.checkFunctionSignature()
-	def __init__(self, wwwWikiRootDir:str):
+	def __init__(self, wwwWikiRootDir:str, bVerbose:bool):
 		if not os.path.isdir(wwwWikiRootDir):
 			raise Exception("No such directory: \"{}\"".format(wwwWikiRootDir))
 		self.__wwwWikiRootDir = wwwWikiRootDir
 
 		self.__userName = getpass.getuser()
+
+		self.__bVerbose = bVerbose
 	#
 
 	################################################################################################################################
@@ -173,7 +175,11 @@ class LocalMediaWikisMgr(object):
 		for i, wikiName in enumerate(wikiNames):
 			with log.descend("Scanning: " + wikiName) as log2:
 				try:
-					extInfos = list(wikis[i].getExtensionInfos())
+					extInfos = []
+					for extInfo in wikis[i].getExtensionInfos():
+						if self.__bVerbose:
+							log2.notice("Succeeded: " + extInfo.name)
+						extInfos.append(extInfo)
 				except Exception as ee:
 					log2.error(ee)
 					extInfos = None
@@ -235,12 +241,17 @@ class LocalMediaWikisMgr(object):
 			maxX = -1
 			maxT2 = 0
 			maxT = 0
+
 			for _x in range(0, len(row)):
 				if row[_x] > maxT:
 					maxT2 = maxT
 					maxT = row[_x]
 					maxX = _x
-				table.row(_y + 2)[_x + 1].color = jk_console.Console.ForeGround.STD_DARKGRAY
+				if table.row(_y + 2)[_x + 1].value == "err":
+					table.row(_y + 2)[_x + 1].color = jk_console.Console.ForeGround.STD_DARKGRAY
+				else:
+					table.row(_y + 2)[_x + 1].color = jk_console.Console.ForeGround.STD_RED
+
 			for _x in range(0, len(row)):
 				if (maxT > 0) and (row[_x] == maxT):
 					table.row(_y + 2)[_x + 1].color = jk_console.Console.ForeGround.STD_YELLOW

@@ -367,7 +367,7 @@ with jk_logging.wrapMain() as log:
 		if not os.path.isdir(cfg[key]):
 			raise Exception(key + ": Directory does not exist: " + repr(cfg[key]))
 
-	localMediaWikisMgr = jk_mediawiki.LocalMediaWikisMgr(cfg["wwwWikiRootDir"])
+	localMediaWikisMgr = jk_mediawiki.LocalMediaWikisMgr(cfg["wwwWikiRootDir"], bVerbose)
 
 	# process the first command
 
