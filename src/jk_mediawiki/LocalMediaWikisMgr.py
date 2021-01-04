@@ -161,14 +161,27 @@ class LocalMediaWikisMgr(object):
 	#
 	@jk_typing.checkFunctionSignature()
 	def getExtensionMatrix(self, log:jk_logging.AbstractLogger) -> jk_console.SimpleTable:
+		# str[] wikiNames
+		# MediaWikiLocalUserInstallationMgr[] wikis
+		# MediaWikiExtensionInfo[] wikiExtensionInfos
+
 		wikiNames = self.listWikis()
 		wikis = [ jk_mediawiki.MediaWikiLocalUserInstallationMgr(os.path.join(self.__wwwWikiRootDir, wiki), self.__userName) for wiki in wikiNames ]
+		wikiExtensionInfos = []
 
 		allExtensionNames = set()
 		for i, wikiName in enumerate(wikiNames):
-			h = wikis[i]
-			for extInfo in h.getExtensionInfos():
-				allExtensionNames.add(extInfo.name)
+			with log.descend("Scanning: " + wikiName) as log2:
+				try:
+					extInfos = list(wikis[i].getExtensionInfos())
+				except Exception as ee:
+					log2.error(ee)
+					extInfos = None
+
+			wikiExtensionInfos.append(extInfos)
+			if extInfos:
+				for extInfo in extInfos:
+					allExtensionNames.add(extInfo.name)
 		allExtensionNames = sorted(allExtensionNames)
 
 		allExtensionsRowIndex = { name:(i+2) for i, name in enumerate(allExtensionNames) }
@@ -198,20 +211,24 @@ class LocalMediaWikisMgr(object):
 
 		dtEpoch = datetime.datetime(1970, 1, 1)
 		for _x, h in enumerate(wikis):
-			for extInfo in h.getExtensionInfos():
-				colNo = _x + 1
-				rowNo = allExtensionsRowIndex[extInfo.name]
+			colNo = _x + 1
+			if wikiExtensionInfos[_x]:
+				for extInfo in wikiExtensionInfos[_x]:
+					rowNo = allExtensionsRowIndex[extInfo.name]
 
-				s = str(extInfo.version) if extInfo.version else None
-				if extInfo.latestTimeStamp:
-					if s is None:
-						s = extInfo.latestTimeStamp.strftime("%Y-%m-%d")
-					rawTimeData[rowNo - 2][_x] = (extInfo.latestTimeStamp - dtEpoch).total_seconds()
+					s = str(extInfo.version) if extInfo.version else None
+					if extInfo.latestTimeStamp:
+						if s is None:
+							s = extInfo.latestTimeStamp.strftime("%Y-%m-%d")
+						rawTimeData[rowNo - 2][_x] = (extInfo.latestTimeStamp - dtEpoch).total_seconds()
 
-				if s:
-					table.row(rowNo)[colNo].value = s
-				else:
-					table.row(rowNo)[colNo].value = "?"
+					if s:
+						table.row(rowNo)[colNo].value = s
+					else:
+						table.row(rowNo)[colNo].value = "?"
+			else:
+				for rowNo in allExtensionsRowIndex.values():
+					table.row(rowNo)[colNo].value = "err"
 
 		for _y in range(0, len(rawTimeData)):
 			row = rawTimeData[_y]
