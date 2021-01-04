@@ -121,32 +121,7 @@ def waitForServiceStopped(fnGetPIDInfos, name:str, log:jk_logging.AbstractLogger
 			raise Exception("Failed to stop " + name + "!")
 #
 
-#
-# Get a list of all existing Wikis (= running and not running).
-#
-# @param		dict cfg			The content of the user specific configuration file "~/.config/wikilocalctrl.json"
-# @return		str wwwWikiRootDir		The root directory for all local wikis
-# @return		str[] wikiNames			The names of the wikis available.
-#
-def listWikis(cfg:dict) -> typing.Tuple[str,typing.List[str]]:
-	if cfg["wwwWikiRootDir"] is None:
-		raise Exception("Missing configuration: 'wwwWikiRootDir'")
-	if not os.path.isdir(cfg["wwwWikiRootDir"]):
-		raise Exception("No such directory: \"" + cfg["wwwWikiRootDir"] + "\"")
-	candidates = []
-	for entry in os.scandir(cfg["wwwWikiRootDir"]):
-		if entry.name.endswith("cron.sh"):
-			candidates.append(entry.name[:-7])
-	ret = []
-	for candidate in candidates:
-		basePath = os.path.join(cfg["wwwWikiRootDir"], candidate)
-		if os.path.isdir(basePath) \
-			and os.path.isdir(basePath + "db") \
-			and os.path.isfile(basePath + "cron.sh") \
-			and os.path.isfile(basePath + "cron-bg.sh"):
-			ret.append(candidate)
-	return cfg["wwwWikiRootDir"], sorted(ret)
-#
+
 
 
 
@@ -246,84 +221,6 @@ def cmd_diskfree(cfg:dict, log):
 
 
 
-
-def cmd_extensionmatrix(cfg:dict, log):
-	print()
-
-	wwwWikiRootDir, wikiDirNames = listWikis(cfg)
-	wikiNames = sorted(wikiDirNames)
-	wikis = [ jk_mediawiki.MediaWikiLocalUserInstallationMgr(os.path.join(wwwWikiRootDir, wiki), userName) for wiki in wikiNames ]
-
-	allExtensionNames = set()
-	for i, wikiName in enumerate(wikiNames):
-		h = wikis[i]
-		for extInfo in h.getExtensionInfos():
-			allExtensionNames.add(extInfo.name)
-	allExtensionNames = sorted(allExtensionNames)
-
-	allExtensionsRowIndex = { name:(i+2) for i, name in enumerate(allExtensionNames) }
-
-	# prepare data matrix
-
-	columnNames = [ "" ] + allExtensionNames
-	rowNames = [ "" ] + wikiNames
-	rowNames2 = [ "" ] + [ str(w.getVersion()) for w in wikis ]
-	_emptyList = [ "-" for x in wikiNames ]
-	_emptyList2 = [ 0 for x in wikiNames ]
-
-	table = jk_console.SimpleTable()
-	table.addRow(*rowNames)
-	table.addRow(*rowNames2).hlineAfterRow = True
-	table.row(0).color = jk_console.Console.ForeGround.STD_LIGHTCYAN
-	table.row(1).color = jk_console.Console.ForeGround.STD_LIGHTCYAN
-
-	rawTimeData = []
-
-	for extensionName in allExtensionNames:
-		dataRow = [ extensionName ] + _emptyList
-		table.addRow(*dataRow)[0].color = jk_console.Console.ForeGround.STD_LIGHTCYAN
-		rawTimeData.append(list(_emptyList2))
-
-	# fill with raw data
-
-	dtEpoch = datetime.datetime(1970, 1, 1)
-	for _x, h in enumerate(wikis):
-		for extInfo in h.getExtensionInfos():
-			colNo = _x + 1
-			rowNo = allExtensionsRowIndex[extInfo.name]
-
-			s = str(extInfo.version) if extInfo.version else None
-			if extInfo.latestTimeStamp:
-				if s is None:
-					s = extInfo.latestTimeStamp.strftime("%Y-%m-%d")
-				rawTimeData[rowNo - 2][_x] = (extInfo.latestTimeStamp - dtEpoch).total_seconds()
-
-			if s:
-				table.row(rowNo)[colNo].value = s
-			else:
-				table.row(rowNo)[colNo].value = "?"
-
-	for _y in range(0, len(rawTimeData)):
-		row = rawTimeData[_y]
-		maxX = -1
-		maxT2 = 0
-		maxT = 0
-		for _x in range(0, len(row)):
-			if row[_x] > maxT:
-				maxT2 = maxT
-				maxT = row[_x]
-				maxX = _x
-			table.row(_y + 2)[_x + 1].color = jk_console.Console.ForeGround.STD_DARKGRAY
-		for _x in range(0, len(row)):
-			if (maxT > 0) and (row[_x] == maxT):
-				table.row(_y + 2)[_x + 1].color = jk_console.Console.ForeGround.STD_YELLOW
-			elif (maxT2 > 0) and (row[_x] == maxT2):
-				table.row(_y + 2)[_x + 1].color = jk_console.Console.ForeGround.STD_LIGHTGRAY
-
-	# print table
-
-	table.print()
-#
 
 
 
@@ -484,14 +381,14 @@ with jk_logging.wrapMain() as log:
 	# ----------------------------------------------------------------
 
 	elif cmdName == "wikistop":
-		wwwWikiRootDir, wikiNames = listWikis(cfg)
+		wikiNames = localMediaWikisMgr.listWikis()
 		wiki = cmdArgs[0]
 		if wiki not in wikiNames:
 			raise Exception("No such Wiki: \"" + wiki + "\"")
 
 		# ----
 
-		h = jk_mediawiki.MediaWikiLocalUserInstallationMgr(os.path.join(wwwWikiRootDir, wiki), userName)
+		h = jk_mediawiki.MediaWikiLocalUserInstallationMgr(os.path.join(localMediaWikisMgr.wwwWikiRootDir, wiki), userName)
 		bIsRunning = h.isCronScriptRunning()
 
 		pidInfos = h.getCronProcesses()
@@ -503,14 +400,14 @@ with jk_logging.wrapMain() as log:
 	# ----------------------------------------------------------------
 
 	elif cmdName == "wikistart":
-		wwwWikiRootDir, wikiNames = listWikis(cfg)
+		wikiNames = localMediaWikisMgr.listWikis()
 		wiki = cmdArgs[0]
 		if wiki not in wikiNames:
 			raise Exception("No such Wiki: \"" + wiki + "\"")
 
 		# ----
 
-		h = jk_mediawiki.MediaWikiLocalUserInstallationMgr(os.path.join(wwwWikiRootDir, wiki), userName)
+		h = jk_mediawiki.MediaWikiLocalUserInstallationMgr(os.path.join(localMediaWikisMgr.wwwWikiRootDir, wiki), userName)
 
 		pidInfos = h.getCronProcesses()
 		if pidInfos:
@@ -522,7 +419,7 @@ with jk_logging.wrapMain() as log:
 	# ----------------------------------------------------------------
 
 	elif cmdName == "start":
-		wwwWikiRootDir, wikiNames = listWikis(cfg)
+		wikiNames = localMediaWikisMgr.listWikis()
 		wiki = cmdArgs[0]
 		if wiki not in wikiNames:
 			raise Exception("No such Wiki: \"" + wiki + "\"")
@@ -548,7 +445,7 @@ with jk_logging.wrapMain() as log:
 
 		# ----
 
-		h = jk_mediawiki.MediaWikiLocalUserInstallationMgr(os.path.join(wwwWikiRootDir, wiki), userName)
+		h = jk_mediawiki.MediaWikiLocalUserInstallationMgr(os.path.join(localMediaWikisMgr.wwwWikiRootDir, wiki), userName)
 
 		pidInfos = h.getCronProcesses()
 		if pidInfos:
@@ -560,7 +457,7 @@ with jk_logging.wrapMain() as log:
 	# ----------------------------------------------------------------
 
 	elif cmdName == "stop":
-		wwwWikiRootDir, wikiNames = listWikis(cfg)
+		wikiNames = localMediaWikisMgr.listWikis()
 		wiki = cmdArgs[0]
 		if wiki not in wikiNames:
 			raise Exception("No such Wiki: \"" + wiki + "\"")
@@ -570,7 +467,7 @@ with jk_logging.wrapMain() as log:
 
 		# ----
 
-		h = jk_mediawiki.MediaWikiLocalUserInstallationMgr(os.path.join(wwwWikiRootDir, wiki), userName)
+		h = jk_mediawiki.MediaWikiLocalUserInstallationMgr(os.path.join(localMediaWikisMgr.wwwWikiRootDir, wiki), userName)
 
 		pidInfos = h.getCronProcesses()
 		if pidInfos:
@@ -583,7 +480,7 @@ with jk_logging.wrapMain() as log:
 		allRunningWikis = []
 		for wikiToCheck in wikiNames:
 			if wikiToCheck != wiki:
-				h = jk_mediawiki.MediaWikiLocalUserInstallationMgr(os.path.join(wwwWikiRootDir, wiki), userName)
+				h = jk_mediawiki.MediaWikiLocalUserInstallationMgr(os.path.join(localMediaWikisMgr.wwwWikiRootDir, wiki), userName)
 				pidInfos = h.getCronProcesses()
 				if pidInfos:
 					allRunningWikis.append(wikiToCheck)
