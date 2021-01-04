@@ -411,13 +411,14 @@ with jk_logging.wrapMain() as log:
 	userName = getpass.getuser()
 	homeDir = os.environ["HOME"]
 	cfgPath = os.path.join(homeDir, ".config/wikilocalctrl.json")
+	if bVerbose:
+		log.notice("Loading: " + cfgPath)
 	if os.path.isfile(cfgPath):
-		if bVerbose:
-			log.notice("Loading: " + cfgPath)
 		cfg = jk_json.loadFromFile(cfgPath)
 	else:
 		raise Exception("No configuration file: '~/.config/wikilocalctrl.json'")
-	log.notice("Verifying configuration ...")
+	if bVerbose:
+		log.notice("Verifying configuration ...")
 	for key in [ "wwwWikiRootDir", "httpBinDir" ]:
 		if (key in parsedArgs.optionData) and (parsedArgs.optionData[key] is not None):
 			cfg[key] = parsedArgs.optionData[key]
