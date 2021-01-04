@@ -24,7 +24,9 @@ from .MediaWikiExtensionInfo import MediaWikiExtensionInfo
 
 #
 # This class helps dealing with local MediaWiki installations running using a local user account.
-# This is the preferred way for local MediaWiki installations. But please have in mind that this follows certain conventions:
+# Instances of this class represent a single MediaWiki installation.
+#
+# This is the preferred way for managing local MediaWiki installations. But please have in mind that this follows certain conventions:
 #
 # * NGINX is used (and must be configured to serve the wiki pages).
 # * There is a `bin`-directory that holds start scripts for PHP-FPM and NGINX. Each script must use `nohub` to run the processes.

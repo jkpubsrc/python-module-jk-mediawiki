@@ -426,6 +426,8 @@ with jk_logging.wrapMain() as log:
 		if not os.path.isdir(cfg[key]):
 			raise Exception(key + ": Directory does not exist: " + repr(cfg[key]))
 
+	localMediaWikisMgr = jk_mediawiki.LocalMediaWikisMgr(cfg["wwwWikiRootDir"])
+
 	# process the first command
 
 	try:
@@ -530,8 +532,12 @@ with jk_logging.wrapMain() as log:
 	# ----------------------------------------------------------------
 
 	elif cmdName == "wikistatus":
-		cmd_wikistatus(cfg, False, log)
+		r = localMediaWikisMgr.getStatusOverview(False, log)
+	
 		print()
+		r.table.print()
+		print()
+
 		sys.exit(0)
 
 	# ----------------------------------------------------------------
@@ -665,12 +671,19 @@ with jk_logging.wrapMain() as log:
 	elif cmdName == "status":
 		pids1 = cmd_httpstatus(cfg, log)
 		assert isinstance(pids1, list)
-		pids2 = wrapped_cmd_wikistatus(cfg, False, log)
-		assert isinstance(pids2, list)
+
+		r = localMediaWikisMgr.getStatusOverview(False, log)
+	
+		print()
+		r.table.print()
+		print()
+
+		#pids2 = wrapped_cmd_wikistatus(cfg, False, log)
+		#assert isinstance(pids2, list)
 
 		pids = []
 		pids.extend(pids1)
-		pids.extend(pids2)
+		pids.extend(r.pids)
 		print_mem_used_by_pids(pids)
 
 		cmd_diskfree(cfg, log)
@@ -681,7 +694,13 @@ with jk_logging.wrapMain() as log:
 
 	elif cmdName == "statusfull":
 		cmd_httpstatus(cfg, log)
-		cmd_wikistatus(cfg, True, log)
+
+		r = localMediaWikisMgr.getStatusOverview(True, log)
+
+		print()
+		r.table.print()
+		print()
+
 		cmd_diskfree(cfg, log)
 		print()
 		sys.exit(0)
