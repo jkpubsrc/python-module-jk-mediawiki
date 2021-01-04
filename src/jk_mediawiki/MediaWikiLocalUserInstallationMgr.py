@@ -345,14 +345,21 @@ class MediaWikiLocalUserInstallationMgr(object):
 	#															(This situation might change in the future.)
 	#
 	def getExtensionInfos(self, log:jk_logging.AbstractLogger = None):
+		allExtsToAnalyize = {}		# name -> path
+
 		for fe in os.scandir(self.wikiExtensionsDirPath):
 			if fe.is_symlink() or not fe.is_dir():
 				continue
 			extensionDirPath = fe.path
 			name = fe.name
 
+			allExtsToAnalyize[name] = extensionDirPath
+
+		for name in sorted(allExtsToAnalyize.keys()):
+			extensionDirPath = allExtsToAnalyize[name]
+
 			if log:
-				with log.descend("Analyzing: " + name) as log2:
+				with log.descend("Analyzing extension: " + name) as log2:
 					ex = self.__getExtensionInfo(name, extensionDirPath)
 			else:
 				ex = self.__getExtensionInfo(name, extensionDirPath)

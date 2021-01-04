@@ -173,7 +173,7 @@ class LocalMediaWikisMgr(object):
 
 		allExtensionNames = set()
 		for i, wikiName in enumerate(wikiNames):
-			with log.descend("Scanning: " + wikiName) as log2:
+			with log.descend("Scanning: {}".format(wikiName)) as log2:
 				try:
 					extInfos = []
 					for extInfo in wikis[i].getExtensionInfos():
@@ -182,6 +182,7 @@ class LocalMediaWikisMgr(object):
 						extInfos.append(extInfo)
 				except Exception as ee:
 					log2.error(ee)
+					log2.error("Stopping scanning for {} because of errors.".format(wikiName))
 					extInfos = None
 
 			wikiExtensionInfos.append(extInfos)
