@@ -178,11 +178,12 @@ class LocalMediaWikisMgr(object):
 					if self.__bVerbose:
 						extInfos = []
 						for extInfo in wikis[i].getExtensionInfos(log2):
-							if self.__bVerbose:
-								log2.notice("Succeeded: " + extInfo.name)
 							extInfos.append(extInfo)
 					else:
 						extInfos = list(wikis[i].getExtensionInfos())
+				except jk_logging.ExceptionInChildContextException as ee:
+					log2.error("Stopping scanning for {} because of errors.".format(wikiName))
+					extInfos = None
 				except Exception as ee:
 					log2.error(ee)
 					log2.error("Stopping scanning for {} because of errors.".format(wikiName))
