@@ -1,7 +1,7 @@
 ﻿
 
 
-__version__ = "0.2021.11.14"
+__version__ = "0.2021.11.14.1"
 
 
 
@@ -18,4 +18,3 @@ from .MediaWikiLocalUserInstallationMgr import MediaWikiLocalUserInstallationMgr
 from .LocalMediaWikisMgr import LocalMediaWikisMgr
 
 ################################################################################################################################
-

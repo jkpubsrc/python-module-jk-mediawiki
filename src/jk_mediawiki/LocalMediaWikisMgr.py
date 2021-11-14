@@ -14,6 +14,9 @@ import jk_json
 import jk_logging
 import jk_sysinfo
 
+from .LocalWikiScanner import LocalWikiScanner, WikiInstInfo
+
+
 
 
 
@@ -61,11 +64,13 @@ class LocalMediaWikisMgr(object):
 	def __init__(self, wwwWikiRootDir:str, bVerbose:bool):
 		if not os.path.isdir(wwwWikiRootDir):
 			raise Exception("No such directory: \"{}\"".format(wwwWikiRootDir))
-		self.__wwwWikiRootDir = wwwWikiRootDir
+		self.__wwwWikiRootDir = os.path.abspath(wwwWikiRootDir)
 
 		self.__userName = getpass.getuser()
 
 		self.__bVerbose = bVerbose
+
+		self.__wikiScanner = LocalWikiScanner(self.__wwwWikiRootDir)
 	#
 
 	################################################################################################################################
@@ -94,19 +99,7 @@ class LocalMediaWikisMgr(object):
 	# @return		str[] wikiNames			The names of the wikis available.
 	#
 	def listWikis(self) -> list:
-		candidates = []
-		for entry in os.scandir(self.__wwwWikiRootDir):
-			if entry.name.endswith("cron.sh"):
-				candidates.append(entry.name[:-7])
-		ret = []
-		for candidate in candidates:
-			basePath = os.path.join(self.__wwwWikiRootDir, candidate)
-			if os.path.isdir(basePath) \
-				and os.path.isdir(basePath + "db") \
-				and os.path.isfile(basePath + "cron.sh") \
-				and os.path.isfile(basePath + "cron-bg.sh"):
-				ret.append(candidate)
-		return sorted(ret)
+		return self.__wikiScanner.wikiNames
 	#
 
 	#
@@ -114,7 +107,7 @@ class LocalMediaWikisMgr(object):
 	#
 	@jk_typing.checkFunctionSignature()
 	def getStatusOverview(self, bWithDiskSpace:bool, log:jk_logging.AbstractLogger) -> _StatusOverviewResult:
-		wikiNames = self.listWikis()
+		wikiInsts = self.__wikiScanner.wikis
 
 		pids = []
 
@@ -126,9 +119,9 @@ class LocalMediaWikisMgr(object):
 		t.addRow(*rowData).hlineAfterRow = True
 		r = jk_console.Console.RESET
 
-		for wiki in wikiNames:
-			with log.descend("Checking wiki: " + wiki) as log2:
-				h = jk_mediawiki.MediaWikiLocalUserInstallationMgr(os.path.join(self.__wwwWikiRootDir, wiki), self.__userName)
+		for wikiInst in wikiInsts:
+			with log.descend("Checking wiki: " + wikiInst.name) as log2:
+				h = jk_mediawiki.MediaWikiLocalUserInstallationMgr(wikiInst.instDirPath, self.__userName)
 				bIsRunning = h.isCronScriptRunning()
 				c = jk_console.Console.ForeGround.STD_GREEN if bIsRunning else jk_console.Console.ForeGround.STD_DARKGRAY
 				smVersion = h.getSMWVersion()
@@ -139,7 +132,7 @@ class LocalMediaWikisMgr(object):
 					processPIDs = [ x["pid"] for x in processInfos ]
 					pids.extend(processPIDs)
 				rowData = [
-					wiki,
+					wikiInst.name,
 					str(h.getVersion()),
 					str(smVersion) if smVersion else "-",
 					"running" if bIsRunning else "stopped",
@@ -167,8 +160,9 @@ class LocalMediaWikisMgr(object):
 		# MediaWikiLocalUserInstallationMgr[] wikis
 		# MediaWikiExtensionInfo[] wikiExtensionInfos
 
-		wikiNames = self.listWikis()
-		wikis = [ jk_mediawiki.MediaWikiLocalUserInstallationMgr(os.path.join(self.__wwwWikiRootDir, wiki), self.__userName) for wiki in wikiNames ]
+		wikiInsts = self.__wikiScanner.wikis
+		wikiNames = [ wikiInst.name for wikiInst in wikiInsts ]
+		wikis = [ jk_mediawiki.MediaWikiLocalUserInstallationMgr(wikiInst.instDirPath, self.__userName) for wikiInst in wikiInsts ]
 		wikiExtensionInfos = []
 
 		allExtensionNames = set()

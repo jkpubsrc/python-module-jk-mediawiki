@@ -6,4 +6,5 @@
 * 2021-11-14
 	* added: scanning the skin directory
 	* improved: extension scanning and extension information code
+	* improved: layout of storage directories (incl. autodetect)
 
