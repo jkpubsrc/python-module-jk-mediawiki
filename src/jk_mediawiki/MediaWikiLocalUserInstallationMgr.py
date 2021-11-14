@@ -8,7 +8,6 @@ import datetime
 import jk_utils
 import jk_sysinfo
 import jk_json
-import jk_mediawiki
 import jk_logging
 import jk_typing
 import jk_version
@@ -17,6 +16,7 @@ from .Utils import Utils
 from .MediaWikiSkinInfo import MediaWikiSkinInfo
 from .MediaWikiDiskUsageInfo import MediaWikiDiskUsageInfo
 from .MediaWikiExtensionInfo import MediaWikiExtensionInfo
+from .MediaWikiLocalSettingsFile import MediaWikiLocalSettingsFile
 
 
 
@@ -89,7 +89,7 @@ class MediaWikiLocalUserInstallationMgr(object):
 
 		self.__wikiDirPath = mediaWikiDirPath
 
-		mwLocalSettings = jk_mediawiki.MediaWikiLocalSettingsFile()
+		mwLocalSettings = MediaWikiLocalSettingsFile()
 		mwLocalSettings.load(dirPath = mediaWikiDirPath)
 
 		#mwLocalSettings.dump()			# DEBUG
@@ -258,8 +258,8 @@ class MediaWikiLocalUserInstallationMgr(object):
 	#
 	# Load the MediaWiki file "LocalSettings.php" and return it.
 	#
-	def loadMediaWikiLocalSettingsFile(self) -> jk_mediawiki.MediaWikiLocalSettingsFile:
-		mwLocalSettings = jk_mediawiki.MediaWikiLocalSettingsFile()
+	def loadMediaWikiLocalSettingsFile(self) -> MediaWikiLocalSettingsFile:
+		mwLocalSettings = MediaWikiLocalSettingsFile()
 		mwLocalSettings.load(dirPath = self.__wikiDirPath)
 		return mwLocalSettings
 	#

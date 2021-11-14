@@ -28,6 +28,14 @@ setup(
 	install_requires = [
 		"jk_utils",
 		"jk_console",
+		"jk_argparsing",
+		"jk_json",
+		"jk_version",
+		"jk_typing",
+		"jk_logging",
+		"jk_sysinfo",
+		"jk_mounting",
+		"jk_prettyprintobj",
 	],
 	keywords = [
 		"mediawiki",
@@ -42,7 +50,7 @@ setup(
 	scripts = [
 		"bin/wikilocalctrl.py",
 	],
-	version = "0.2021.11.14.1",
+	version = "0.2021.11.15",
 	zip_safe = False,
 	long_description = readme(),
 	long_description_content_type="text/markdown",

@@ -3,7 +3,6 @@
 import os
 import typing
 import datetime
-import collections
 
 import jk_typing
 import jk_version

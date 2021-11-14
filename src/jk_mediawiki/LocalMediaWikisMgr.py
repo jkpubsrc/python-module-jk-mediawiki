@@ -4,15 +4,11 @@ import os
 import typing
 import getpass
 import datetime
-import sys
-import time
 
 import jk_typing
 import jk_console
 import jk_mediawiki
-import jk_json
 import jk_logging
-import jk_sysinfo
 
 from .LocalWikiScanner import LocalWikiScanner, WikiInstInfo
 

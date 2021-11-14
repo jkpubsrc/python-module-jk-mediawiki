@@ -5,13 +5,10 @@ import signal
 import subprocess
 import typing
 
-import jk_pathpatternmatcher2
 import jk_utils
 import jk_sysinfo
-import jk_json
-import jk_mediawiki
 import jk_logging
-from jk_typing import *
+import jk_typing
 
 
 
@@ -45,7 +42,7 @@ class MediaWikiLocalUserServiceMgr(object):
 	# @param	str localEtcDirPath			The path of the local 'etc' directory used by the NGINX and PHP process
 	# @param	str userName				The name of the user account under which NGINX, PHP and the Wiki cron process are executed.
 	#
-	@checkFunctionSignature()
+	@jk_typing.checkFunctionSignature()
 	def __init__(self,
 		startNGINXScript:str,
 		startPHPFPMScript:str,

@@ -22,7 +22,7 @@
 		"license": "Apache2",
 		"name": "jk_mediawiki",
 		"packageClass": "python-module",
-		"version": "0.2021.11.14.1"
+		"version": "0.2021.11.15"
 	},
 	"repositories": [
 		{
@@ -40,18 +40,17 @@
 	"requirements": {
 		"python_packages": [
 			"jk_utils",
-			"jk_console"
-		],
-		"python_packages_dev": [
+			"jk_console",
+			"jk_argparsing",
+			"jk_json",
+			"jk_version",
 			"jk_typing",
 			"jk_logging",
-			"jk_argparsing",
-			"jk_pwdinput",
-			"jk_json",
-			"jk_testing",
 			"jk_sysinfo",
 			"jk_mounting",
 			"jk_prettyprintobj",
+		],
+		"python_packages_dev": [
 		],
 		"system_apt_packages": []
 	},

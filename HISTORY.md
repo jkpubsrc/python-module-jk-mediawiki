@@ -7,4 +7,5 @@
 	* added: scanning the skin directory
 	* improved: extension scanning and extension information code
 	* improved: layout of storage directories (incl. autodetect)
+	* fixed: dependencies
 
