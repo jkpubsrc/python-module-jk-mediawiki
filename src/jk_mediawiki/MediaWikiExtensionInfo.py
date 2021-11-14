@@ -1,11 +1,14 @@
 
 
+import os
 import typing
 import datetime
 import collections
 
 import jk_typing
 import jk_version
+import jk_prettyprintobj
+import jk_json
 
 from .Utils import Utils
 
@@ -18,31 +21,48 @@ from .Utils import Utils
 
 
 
-class MediaWikiExtensionInfo(object):
+class MediaWikiExtensionInfo(jk_prettyprintobj.DumpMixin):
+
+	################################################################################################################################
+	## Constants
+	################################################################################################################################
+
+	################################################################################################################################
+	## Constructor
+	################################################################################################################################
 
 	@jk_typing.checkFunctionSignature()
-	def __init__(self, extensionDirPath:str, name:str, version:typing.Union[str,jk_version.Version,None]):
+	def __init__(self, extensionDirPath:str, jExtCfg:dict):
 		self.__extensionDirPath = extensionDirPath
-		self.name = name
-		self.__version = version
-		self.__size = None
+		self.__jExtCfg = jExtCfg
+		self.__cachedSize = None
 		self.__latestTimeStamp = None
 		self.__latestTimeStamp_hasValue = False
 	#
+
+	################################################################################################################################
+	## Public Properties
+	################################################################################################################################
 
 	@property
 	def extensionDirPath(self) -> str:
 		return self.__extensionDirPath
 	#
 
-	#@property
-	#def name(self) -> str:
-	#	return self.__name
+	@property
+	def name(self) -> str:
+		return self.__jExtCfg["name"]
 	#
 
 	@property
 	def version(self) -> typing.Union[str,jk_version.Version,None]:
-		return self.__version
+		if "version" not in self.__jExtCfg:
+			return None
+		s = self.__jExtCfg["version"]
+		try:
+			return jk_version.Version(s)
+		except:
+			return s
 	#
 
 	@property
@@ -57,13 +77,43 @@ class MediaWikiExtensionInfo(object):
 
 	@property
 	def size(self) -> int:
-		if self.__size is None:
-			self.__size = Utils.getDiskSpaceRecursively(self.__extensionDirPath)
-		return self.__size
+		if self.__cachedSize is None:
+			self.__cachedSize = Utils.getDiskSpaceRecursively(self.__extensionDirPath)
+		return self.__cachedSize
+	#
+
+	################################################################################################################################
+	## Helper Methods
+	################################################################################################################################
+
+	def _dumpVarNames(self):
+		return [
+			"name",
+			"extensionDirPath",
+			"version",
+			"latestTimeStamp",
+			"size",
+		]
+	#
+
+	################################################################################################################################
+	## Public Methods
+	################################################################################################################################
+
+	@staticmethod
+	def loadFromDir(extensionDirPath:str):
+		extFilePath = os.path.join(extensionDirPath, "extension.json")
+		if not os.path.isfile(extFilePath):
+			raise Exception("Not an extension directory: " + extensionDirPath)
+
+		jExtCfg = jk_json.loadFromFile(extFilePath)
+		if ("name" not in jExtCfg) or (jExtCfg.get("manifest_version") is None) or (jExtCfg.get("manifest_version") < 1):
+			raise Exception("Not an extension: " + extensionDirPath)
+
+		return MediaWikiExtensionInfo(extensionDirPath, jExtCfg)
 	#
 
 #
-
 
 
 

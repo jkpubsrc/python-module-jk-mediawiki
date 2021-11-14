@@ -10,10 +10,11 @@ import jk_sysinfo
 import jk_json
 import jk_mediawiki
 import jk_logging
-from jk_typing import *
+import jk_typing
 import jk_version
 
 from .Utils import Utils
+from .MediaWikiSkinInfo import MediaWikiSkinInfo
 from .MediaWikiDiskUsageInfo import MediaWikiDiskUsageInfo
 from .MediaWikiExtensionInfo import MediaWikiExtensionInfo
 
@@ -38,6 +39,14 @@ from .MediaWikiExtensionInfo import MediaWikiExtensionInfo
 #
 class MediaWikiLocalUserInstallationMgr(object):
 
+	################################################################################################################################
+	## Constants
+	################################################################################################################################
+
+	################################################################################################################################
+	## Variables
+	################################################################################################################################
+
 	# @field		str __userName					The name of the user account under which NGINX, PHP and the Wiki cron process are executed.
 	# @field		str __wikiDirPath				The absolute directory path where the MediaWiki installation can be found.
 	# @field		str __wikiDirName				The name of the directory the Wiki resides in
@@ -45,6 +54,10 @@ class MediaWikiLocalUserInstallationMgr(object):
 	# @field		str __cronScriptFilePath		The path of the cron script file
 	# @field		str __cronScriptDirPath			For convenience: The directory where the cron script file resides in
 	# @field		str __cronScriptFileName		For convenience: The name of the cron script file without it's parent directory information
+
+	################################################################################################################################
+	## Constructor
+	################################################################################################################################
 
 	#
 	# Configuration parameters:
@@ -54,10 +67,10 @@ class MediaWikiLocalUserInstallationMgr(object):
 	#										Additionally there must be a cron script named "<sitename>cron.sh".
 	# @param	str userName				(required) The name of the user account under which NGINX, PHP and the Wiki cron process are executed.
 	#
-	@checkFunctionSignature()
+	@jk_typing.checkFunctionSignature()
 	def __init__(self,
-		mediaWikiDirPath:str,
-		userName:str,
+			mediaWikiDirPath:str,
+			userName:str,
 		):
 
 		# store and process the account name the system processes are running under
@@ -123,6 +136,10 @@ class MediaWikiLocalUserInstallationMgr(object):
 		self.__cronScriptFileName = os.path.basename(self.__cronScriptFilePath) if self.__cronScriptFilePath else None
 	#
 
+	################################################################################################################################
+	## Properties
+	################################################################################################################################
+
 	@property
 	def wikiLocalSettingsFilePath(self) -> str:
 		filePath = os.path.join(self.__wikiDirPath, "LocalSettings.php")
@@ -154,7 +171,7 @@ class MediaWikiLocalUserInstallationMgr(object):
 	#
 
 	#
-	# The installation directory of the media wiki installation
+	# The root directory of the media wiki installation. Here resides the LocalSettings.php file.
 	#
 	@property
 	def wikiDirPath(self) -> str:
@@ -162,7 +179,7 @@ class MediaWikiLocalUserInstallationMgr(object):
 	#
 
 	#
-	# The parent directory of the media wiki installation
+	# The parent directory of the media wiki installation.
 	#
 	@property
 	def wikiBaseDirPath(self) -> str:
@@ -187,6 +204,51 @@ class MediaWikiLocalUserInstallationMgr(object):
 	@property
 	def cronScriptDirPath(self) -> str:
 		return self.__cronScriptDirPath
+	#
+
+	################################################################################################################################
+	## Helper Methods
+	################################################################################################################################
+
+	################################################################################################################################
+	## Public Methods
+	################################################################################################################################
+
+	#
+	# This method scans the MediaWiki skin directory and returns a sorted list of skins.
+	#
+	# @param			jk_logging.AbstractLogger log			(optional) A logger for debug output. If you run into problems loading and analyzing
+	#															a skin (yes, that can happens as skins might have errors) specify a debug logger
+	#															here as all analyzing is done during runtime of this method.
+	#															If you don't specify a logger, any kind of errors are silently ignored.
+	#
+	# @return			MediaWikiSkinInfo[]						Returns skin information objects.
+	#
+	def getSkinInfos(self, log:jk_logging.AbstractLogger = None) -> typing.List[MediaWikiSkinInfo]:
+		ret = []
+
+		for fe in os.scandir(os.path.join(self.__wikiDirPath, "skins")):
+			if fe.is_dir():
+
+				if log:
+					with log.descend("Analyzing skin: " + fe.name) as log2:
+						try:
+							skin = MediaWikiSkinInfo.loadFromDir(fe.path)
+						except Exception as ee:
+							log.error("Failed to load: " + fe.name)
+							continue
+				else:
+					try:
+						skin = MediaWikiSkinInfo.loadFromDir(fe.path)
+					except Exception as ee:
+						print("WARNING: Failed to load: " + fe.name)
+						continue
+
+				ret.append(skin)
+
+		ret.sort(key=lambda x: x.name)
+
+		return ret
 	#
 
 	def isCronScriptRunning(self):
@@ -334,50 +396,44 @@ class MediaWikiLocalUserInstallationMgr(object):
 	#
 
 	#
-	# This method is a generator that returns information about extensions available in the MediaWiki extension directory.
+	# This method returns a sorted list about installed extensions.
 	#
-	# @param			jk_logging.AbstractLogger log			(optional) A logger for debug output; if you run into problems loading and analyzing
+	# @param			jk_logging.AbstractLogger log			(optional) A logger for debug output. If you run into problems loading and analyzing
 	#															an extention (yes, that happens, as extensions might have errors) specify a debug logger
-	#															here, as all analyzing is done immediately on calling this method;
-	# @return			MediaWikiExtensionInfo[]				Yields extension information objects.
+	#															here as all analyzing is done during runtime of this method.
+	#															If you don't specify a logger, any kind of errors are silently ignored.
+	#
+	# @return			MediaWikiExtensionInfo[]				Returns extension information objects.
 	#															Please note that versions in extension information objects are currently strings
-	#															as some extensions use a completely non-standard, off the limit versioning schema.
-	#															(This situation might change in the future.)
+	#															as some extensions use a completely non-standard versioning schema.
+	#															(This might change in the future.)
 	#
-	def getExtensionInfos(self, log:jk_logging.AbstractLogger = None):
-		allExtsToAnalyize = {}		# name -> path
+	@jk_typing.checkFunctionSignature()
+	def getExtensionInfos(self, log:jk_logging.AbstractLogger = None) -> typing.List[MediaWikiExtensionInfo]:
+		ret = []
 
-		for fe in os.scandir(self.wikiExtensionsDirPath):
-			if fe.is_symlink() or not fe.is_dir():
-				continue
-			extensionDirPath = fe.path
-			name = fe.name
+		for fe in os.scandir(os.path.join(self.__wikiDirPath, "extensions")):
+			if fe.is_dir():
 
-			allExtsToAnalyize[name] = extensionDirPath
+				if log:
+					with log.descend("Analyzing extension: " + fe.name) as log2:
+						try:
+							ext = MediaWikiExtensionInfo.loadFromDir(fe.path)
+						except Exception as ee:
+							log.error("Failed to load: " + fe.name)
+							continue
+				else:
+					try:
+						ext = MediaWikiExtensionInfo.loadFromDir(fe.path)
+					except Exception as ee:
+						#print("WARNING: Failed to load: " + fe.name)
+						continue
 
-		for name in sorted(allExtsToAnalyize.keys()):
-			extensionDirPath = allExtsToAnalyize[name]
+				ret.append(ext)
 
-			if log:
-				with log.descend("Analyzing extension: " + name) as log2:
-					ex = self.__getExtensionInfo(name, extensionDirPath)
-			else:
-				ex = self.__getExtensionInfo(name, extensionDirPath)
+		ret.sort(key=lambda x: x.name)
 
-			yield ex
-	#
-
-	def __getExtensionInfo(self, name:str, extensionDirPath:str) -> MediaWikiExtensionInfo:
-		version = None
-
-		extensionJSONFilePath = os.path.join(extensionDirPath, "extension.json")
-		if os.path.isfile(extensionJSONFilePath):
-			jDict = jk_json.loadFromFile(extensionJSONFilePath)
-			name = jDict["name"]
-			if "version" in jDict:
-				version = jDict["version"]
-
-		return MediaWikiExtensionInfo(extensionDirPath, name, version)
+		return ret
 	#
 
 	def getDiskUsage(self) -> MediaWikiDiskUsageInfo:
@@ -398,6 +454,10 @@ class MediaWikiLocalUserInstallationMgr(object):
 
 		return MediaWikiDiskUsageInfo(sizeCore, sizeCache, sizeImages, sizeExtensions, sizeDatabase)
 	#
+
+	################################################################################################################################
+	## Static Methods
+	################################################################################################################################
 
 #
 

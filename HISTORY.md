@@ -3,4 +3,7 @@
 	* code refactored
 	* improved verbose output
 	* improved dealing with errors in installed extensions
+* 2021-11-14
+	* added: scanning the skin directory
+	* improved: extension scanning and extension information code
 

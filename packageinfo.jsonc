@@ -22,7 +22,7 @@
 		"license": "Apache2",
 		"name": "jk_mediawiki",
 		"packageClass": "python-module",
-		"version": "0.2021.1.4"
+		"version": "0.2021.11.14"
 	},
 	"repositories": [
 		{
@@ -51,7 +51,7 @@
 			"jk_testing",
 			"jk_sysinfo",
 			"jk_mounting",
-			"jk_sysinfo"
+			"jk_prettyprintobj",
 		],
 		"system_apt_packages": []
 	},
