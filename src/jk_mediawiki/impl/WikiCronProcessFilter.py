@@ -9,10 +9,6 @@ import os
 import typing
 
 import jk_typing
-import jk_utils
-import jk_logging
-import jk_json
-import jk_prettyprintobj
 
 from .ProcessFilter import ProcessFilter
 
@@ -31,7 +27,7 @@ class WikiCronProcessFilter(ProcessFilter):
 	# Constructor method.
 	#
 	@jk_typing.checkFunctionSignature()
-	def __init__(self, userName:str, wikiInstDirPath:str, source:typing.Callable):
+	def __init__(self, userName:str, wikiInstDirPath:typing.Union[str,None], source:typing.Callable):
 		# {
 		#	'ppid': 21827,
 		#	'pid': 21841,
@@ -49,7 +45,7 @@ class WikiCronProcessFilter(ProcessFilter):
 			userName = userName,
 			cmdExact="php",
 			#argEndsWith="runJobs.php",
-			argExact=os.path.join(wikiInstDirPath, "maintenance", "runJobs.php")
+			argExact=os.path.join(wikiInstDirPath, "maintenance", "runJobs.php") if wikiInstDirPath else None
 		)
 	#
 

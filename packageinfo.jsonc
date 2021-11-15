@@ -49,6 +49,7 @@
 			"jk_sysinfo",
 			"jk_mounting",
 			"jk_prettyprintobj",
+			"jk_cachefunccalls",
 		],
 		"python_packages_dev": [
 		],

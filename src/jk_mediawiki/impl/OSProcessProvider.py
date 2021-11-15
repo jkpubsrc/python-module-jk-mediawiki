@@ -4,19 +4,17 @@ import os
 import typing
 
 import jk_typing
-import jk_utils
-import jk_logging
-import jk_json
-import jk_prettyprintobj
 import jk_sysinfo
 import jk_cachefunccalls
 
+from .AbstractProcessFilter import AbstractProcessFilter
 
 
 
 
 
-class OSProcessProvider(object):
+
+class OSProcessProvider(AbstractProcessFilter):
 
 	################################################################################################################################
 	## Constructor
@@ -42,13 +40,20 @@ class OSProcessProvider(object):
 	## Public Methods
 	################################################################################################################################
 
-	@jk_cachefunccalls.cacheCalls(seconds=1)
+	@jk_cachefunccalls.cacheCalls(seconds=2)
 	def listProcesses(self) -> typing.List[dict]:
-		return jk_sysinfo.get_ps()
-	#
+		ret = []
 
-	def __call__(self):
-		return self.listProcesses()
+		for x in jk_sysinfo.get_ps():
+			if "args" in x:
+				# naive splitting at spaces, regardless of the exact nature of the command line
+				x["args_list"] = [ a.strip() for a in x["args"].split() ]
+			else:
+				# no arguments => empty list
+				x["args_list"] = []
+			ret.append(x)
+
+		return ret
 	#
 
 #

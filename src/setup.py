@@ -36,6 +36,7 @@ setup(
 		"jk_sysinfo",
 		"jk_mounting",
 		"jk_prettyprintobj",
+		"jk_cachefunccalls",
 	],
 	keywords = [
 		"mediawiki",
