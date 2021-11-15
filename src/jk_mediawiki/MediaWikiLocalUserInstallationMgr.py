@@ -287,43 +287,6 @@ class MediaWikiLocalUserInstallationMgr(object):
 			raise Exception("Starting cron process failed!")
 	#
 
-	def __findProcess(self,
-			userName:str = None,
-			cmdExact:str = None,
-			argEndsWith:str = None,
-			argExact:str = None,
-		):
-
-		processList = jk_sysinfo.get_ps()
-		for x in processList:
-
-			# filter by user name
-
-			if userName:
-				if x["user"] != userName:
-					continue
-
-			# filter by command
-
-			if cmdExact:
-				if x["cmd"] != cmdExact:
-					continue
-
-			# filter by argument
-			if argEndsWith or argExact:
-				print("--", argExact)
-				bFound = False
-				for arg in x["args"].split(" "):
-					arg = arg.strip()
-					if arg.endswith(argEndsWith):
-						bFound = True
-						break
-				if not bFound:
-					continue
-
-			yield x
-	#
-
 	#
 	# Returns the master and child processes of the cron script.
 	#

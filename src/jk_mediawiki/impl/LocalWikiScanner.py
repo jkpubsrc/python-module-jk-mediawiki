@@ -9,10 +9,8 @@ import jk_typing
 
 
 
+from .LocalWikiInstInfo import LocalWikiInstInfo
 
-
-
-WikiInstInfo = collections.namedtuple("WikiInstInfo", [ "instDirPath", "name" ])
 
 
 
@@ -54,7 +52,7 @@ class LocalWikiScanner(object):
 	#
 
 	@property
-	def wikis(self) -> typing.List[WikiInstInfo]:
+	def wikis(self) -> typing.List[LocalWikiInstInfo]:
 		if self.__wikis is None:
 			self.__wikis = self.__identifyWikis(self.__wikiRootDir)
 
@@ -78,25 +76,25 @@ class LocalWikiScanner(object):
 	#
 	# This method returns path to root directories of MediaWiki installation directories (= those directories that contain the LocalSettings.php)
 	#
-	def __identifyWikisStorageFormat1(self, wikiInstRootDir:str) -> typing.Iterable[WikiInstInfo]:
+	def __identifyWikisStorageFormat1(self, wikiInstRootDir:str) -> typing.Iterable[LocalWikiInstInfo]:
 		for fe in os.scandir(wikiInstRootDir):
 			if fe.is_file() and fe.name.endswith("cron.sh"):
 				wikiName = fe.name[:-7]
 				instDirPath = os.path.join(wikiInstRootDir, wikiName)
 				if self.__isWikiBaseDir(instDirPath):
-					yield WikiInstInfo(instDirPath, wikiName)
+					yield LocalWikiInstInfo(instDirPath, wikiName)
 	#
 
-	def __identifyWikisStorageFormat2(self, wikiInstRootDir:str) -> typing.Iterable[WikiInstInfo]:
+	def __identifyWikisStorageFormat2(self, wikiInstRootDir:str) -> typing.Iterable[LocalWikiInstInfo]:
 		for fe1 in os.scandir(wikiInstRootDir):
 			if fe1.is_dir():
 				wikiName = fe1.name
 				instDirPath = os.path.join(wikiInstRootDir, wikiName, wikiName)
 				if self.__isWikiBaseDir(instDirPath):
-					yield WikiInstInfo(instDirPath, wikiName)
+					yield LocalWikiInstInfo(instDirPath, wikiName)
 	#
 
-	def __identifyWikis(self, wikiRootDir:str) -> typing.List[WikiInstInfo]:
+	def __identifyWikis(self, wikiRootDir:str) -> typing.List[LocalWikiInstInfo]:
 		ret = []
 
 		ret.extend(self.__identifyWikisStorageFormat1(wikiRootDir))

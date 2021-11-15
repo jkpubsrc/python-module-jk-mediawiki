@@ -62,7 +62,7 @@ ap.createCommand("httpstart", "Start the HTTP service(s).")
 ap.createCommand("httpstop", "Stop the HTTP service(s).")
 ap.createCommand("httpstatus", "Status about the HTTP service(s).")
 ap.createCommand("httprestart", "Restart the HTTP service(s).")
-ap.createCommand("wikistatus", "List existing local Wikis and their status.")
+ap.createCommand("wikistatus", "List existing local Wikis and their status.").expectString("wikiName", minLength=1)
 ap.createCommand("wikistop", "Stop a Wiki service.").expectString("wikiName", minLength=1)
 ap.createCommand("wikistart", "Start a Wiki service.").expectString("wikiName", minLength=1)
 ap.createCommand("status", "List status of HTTP service(s) and local Wikis.")
@@ -379,7 +379,14 @@ with jk_logging.wrapMain() as log:
 	# ----------------------------------------------------------------
 
 	elif cmdName == "wikistatus":
-		r = localMediaWikisMgr.getStatusOverview(False, log)
+		wikiNames = localMediaWikisMgr.listWikis()
+		wikiName = cmdArgs[0]
+		if wikiName not in wikiNames:
+			raise Exception("No such Wiki: \"" + wikiName + "\"")
+
+		# ----
+
+		r = localMediaWikisMgr.getStatusOverviewOne(wikiName, False, log)
 	
 		print()
 		r.table.print()
@@ -391,49 +398,49 @@ with jk_logging.wrapMain() as log:
 
 	elif cmdName == "wikistop":
 		wikiNames = localMediaWikisMgr.listWikis()
-		wiki = cmdArgs[0]
-		if wiki not in wikiNames:
-			raise Exception("No such Wiki: \"" + wiki + "\"")
+		wikiName = cmdArgs[0]
+		if wikiName not in wikiNames:
+			raise Exception("No such Wiki: \"" + wikiName + "\"")
 
 		# ----
 
-		_wikiInstDirPath = localMediaWikisMgr.getWikiInstDirPath(wiki)
+		_wikiInstDirPath = localMediaWikisMgr.getWikiInstDirPath(wikiName)
 		h = jk_mediawiki.MediaWikiLocalUserInstallationMgr(_wikiInstDirPath, userName, log)
 		bIsRunning = h.isCronScriptRunning()
 
 		pidInfos = h.getCronProcesses()
 		if pidInfos:
-			h.stopCronScript(log.descend(wiki + ": Stopping ..."))
+			h.stopCronScript(log.descend(wikiName + ": Stopping ..."))
 		else:
-			log.notice(wiki + ": Already stopped")
+			log.notice(wikiName + ": Already stopped")
 
 	# ----------------------------------------------------------------
 
 	elif cmdName == "wikistart":
 		wikiNames = localMediaWikisMgr.listWikis()
-		wiki = cmdArgs[0]
-		if wiki not in wikiNames:
-			raise Exception("No such Wiki: \"" + wiki + "\"")
+		wikiName = cmdArgs[0]
+		if wikiName not in wikiNames:
+			raise Exception("No such Wiki: \"" + wikiName + "\"")
 
 		# ----
 
-		_wikiInstDirPath = localMediaWikisMgr.getWikiInstDirPath(wiki)
+		_wikiInstDirPath = localMediaWikisMgr.getWikiInstDirPath(wikiName)
 		h = jk_mediawiki.MediaWikiLocalUserInstallationMgr(_wikiInstDirPath, userName, log)
 
 		pidInfos = h.getCronProcesses()
 		if pidInfos:
-			log.notice(wiki + ": Already running")
+			log.notice(wikiName + ": Already running")
 		else:
-			h.startCronScript(log.descend(wiki + ": Starting ..."))
-			waitForServiceStarted(h.getCronProcesses, wiki, log)
+			h.startCronScript(log.descend(wikiName + ": Starting ..."))
+			waitForServiceStarted(h.getCronProcesses, wikiName, log)
 
 	# ----------------------------------------------------------------
 
 	elif cmdName == "start":
 		wikiNames = localMediaWikisMgr.listWikis()
-		wiki = cmdArgs[0]
-		if wiki not in wikiNames:
-			raise Exception("No such Wiki: \"" + wiki + "\"")
+		wikiName = cmdArgs[0]
+		if wikiName not in wikiNames:
+			raise Exception("No such Wiki: \"" + wikiName + "\"")
 
 		h = instantiateLocalUserServiceMgr(cfg, userName, bVerbose)
 
@@ -455,43 +462,43 @@ with jk_logging.wrapMain() as log:
 
 		# ----
 
-		_wikiInstDirPath = localMediaWikisMgr.getWikiInstDirPath(wiki)
+		_wikiInstDirPath = localMediaWikisMgr.getWikiInstDirPath(wikiName)
 		h = jk_mediawiki.MediaWikiLocalUserInstallationMgr(_wikiInstDirPath, userName, log)
 
 		pidInfos = h.getCronProcesses()
 		if pidInfos:
-			log.notice(wiki + ": Already running")
+			log.notice(wikiName + ": Already running")
 		else:
-			h.startCronScript(log.descend(wiki + ": Starting ..."))
-			waitForServiceStarted(h.getCronProcesses, wiki, log)
+			h.startCronScript(log.descend(wikiName + ": Starting ..."))
+			waitForServiceStarted(h.getCronProcesses, wikiName, log)
 
 	# ----------------------------------------------------------------
 
 	elif cmdName == "stop":
 		wikiNames = localMediaWikisMgr.listWikis()
-		wiki = cmdArgs[0]
-		if wiki not in wikiNames:
-			raise Exception("No such Wiki: \"" + wiki + "\"")
+		wikiName = cmdArgs[0]
+		if wikiName not in wikiNames:
+			raise Exception("No such Wiki: \"" + wikiName + "\"")
 
 		h = instantiateLocalUserServiceMgr(cfg, userName, bVerbose)
 
 		# ----
 
-		_wikiInstDirPath = localMediaWikisMgr.getWikiInstDirPath(wiki)
+		_wikiInstDirPath = localMediaWikisMgr.getWikiInstDirPath(wikiName)
 		h = jk_mediawiki.MediaWikiLocalUserInstallationMgr(_wikiInstDirPath, userName, log)
 
 		pidInfos = h.getCronProcesses()
 		if pidInfos:
-			h.stopCronScript(log.descend(wiki + ": Stopping ..."))
+			h.stopCronScript(log.descend(wikiName + ": Stopping ..."))
 		else:
-			log.notice(wiki + ": Already stopped")
+			log.notice(wikiName + ": Already stopped")
 
 		# ----
 
 		allRunningWikis = []
 		for wikiToCheck in wikiNames:
-			if wikiToCheck != wiki:
-				_wikiInstDirPath = localMediaWikisMgr.getWikiInstDirPath(wiki)
+			if wikiToCheck != wikiName:
+				_wikiInstDirPath = localMediaWikisMgr.getWikiInstDirPath(wikiName)
 				h = jk_mediawiki.MediaWikiLocalUserInstallationMgr(_wikiInstDirPath, userName, log)
 				pidInfos = h.getCronProcesses()
 				if pidInfos:
@@ -522,7 +529,7 @@ with jk_logging.wrapMain() as log:
 		pids1 = cmd_httpstatus(cfg, log, bVerbose)
 		assert isinstance(pids1, list)
 
-		r = localMediaWikisMgr.getStatusOverview(False, log)
+		r = localMediaWikisMgr.getStatusOverviewAll(False, log)
 	
 		print()
 		r.table.print()
@@ -542,7 +549,7 @@ with jk_logging.wrapMain() as log:
 	elif cmdName == "statusfull":
 		cmd_httpstatus(cfg, log, bVerbose)
 
-		r = localMediaWikisMgr.getStatusOverview(True, log)
+		r = localMediaWikisMgr.getStatusOverviewAll(True, log)
 
 		print()
 		r.table.print()

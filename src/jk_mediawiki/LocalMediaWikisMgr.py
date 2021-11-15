@@ -10,7 +10,8 @@ import jk_console
 import jk_mediawiki
 import jk_logging
 
-from .LocalWikiScanner import LocalWikiScanner, WikiInstInfo
+from .impl.LocalWikiInstInfo import LocalWikiInstInfo
+from .impl.LocalWikiScanner import LocalWikiScanner
 
 
 
@@ -85,28 +86,11 @@ class LocalMediaWikisMgr(object):
 	## Helper Methods
 	################################################################################################################################
 
-	################################################################################################################################
-	## Public Methods
-	################################################################################################################################
-
-	def getWikiInstDirPath(self, wikiName:str):
-		return self.__wikiScanner.getWikiInstDirPath(wikiName)
-	#
-
-	#
-	# Scan the disk to list all existing Wikis (= running and not running).
-	#
-	# @return		str[] wikiNames			The names of the wikis available.
-	#
-	def listWikis(self) -> list:
-		return self.__wikiScanner.wikiNames
-	#
-
 	#
 	# Collects a list of mediawikis installed
 	#
 	@jk_typing.checkFunctionSignature()
-	def getStatusOverview(self, bWithDiskSpace:bool, log:jk_logging.AbstractLogger) -> _StatusOverviewResult:
+	def _getStatusOverview(self, wikiName:typing.Union[str,None], bWithDiskSpace:bool, log:jk_logging.AbstractLogger) -> _StatusOverviewResult:
 		wikiInsts = self.__wikiScanner.wikis
 
 		pids = []
@@ -120,6 +104,10 @@ class LocalMediaWikisMgr(object):
 		r = jk_console.Console.RESET
 
 		for wikiInst in wikiInsts:
+			if wikiName:
+				if wikiInst.name != wikiName:
+					continue
+
 			with log.descend("Checking wiki: " + wikiInst.name) as log2:
 				h = jk_mediawiki.MediaWikiLocalUserInstallationMgr(wikiInst.instDirPath, self.__userName, log2)
 				bIsRunning = h.isCronScriptRunning()
@@ -149,6 +137,39 @@ class LocalMediaWikisMgr(object):
 				t.addRow(*rowData).color = c
 
 		return _StatusOverviewResult(t, pids)
+	#
+
+	################################################################################################################################
+	## Public Methods
+	################################################################################################################################
+
+	def getWikiInstDirPath(self, wikiName:str):
+		return self.__wikiScanner.getWikiInstDirPath(wikiName)
+	#
+
+	#
+	# Scan the disk to list all existing Wikis (= running and not running).
+	#
+	# @return		str[] wikiNames			The names of the wikis available.
+	#
+	def listWikis(self) -> list:
+		return self.__wikiScanner.wikiNames
+	#
+
+	#
+	# Collects a list of mediawikis installed
+	#
+	@jk_typing.checkFunctionSignature()
+	def getStatusOverviewAll(self, bWithDiskSpace:bool, log:jk_logging.AbstractLogger) -> _StatusOverviewResult:
+		return self._getStatusOverview(None, bWithDiskSpace, log)
+	#
+
+	#
+	# Collects a list of mediawikis installed
+	#
+	@jk_typing.checkFunctionSignature()
+	def getStatusOverviewOne(self, wikiName:str, bWithDiskSpace:bool, log:jk_logging.AbstractLogger) -> _StatusOverviewResult:
+		return self._getStatusOverview(wikiName, bWithDiskSpace, log)
 	#
 
 	#
