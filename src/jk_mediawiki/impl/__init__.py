@@ -10,6 +10,7 @@ from .LocalWikiScanner import LocalWikiScanner
 from .OSProcessProvider import OSProcessProvider
 from .ProcessFilter import ProcessFilter
 from .WikiCronProcessFilter import WikiCronProcessFilter
+from .WikiPHPProcessFilter import WikiPHPProcessFilter
 
 
 

@@ -21,7 +21,7 @@ from .ProcessFilter import ProcessFilter
 
 
 
-class WikiCronProcessFilter(ProcessFilter):
+class WikiPHPProcessFilter(ProcessFilter):
 
 	################################################################################################################################
 	## Constructor
@@ -31,25 +31,24 @@ class WikiCronProcessFilter(ProcessFilter):
 	# Constructor method.
 	#
 	@jk_typing.checkFunctionSignature()
-	def __init__(self, userName:str, wikiInstDirPath:str, source:typing.Callable):
+	def __init__(self, userName:str, source:typing.Callable):
 		# {
-		#	'ppid': 21827,
-		#	'pid': 21841,
-		#	'tty': 'pts/7',
-		#	'stat': 'S',
+		#	'ppid': 1,
+		#	'pid': 16406,
+		#	'tty': None,
+		#	'stat': 'Ss',
 		#	'uid': 1000,
 		#	'gid': 1000,
-		#	'cmd': 'php',
-		#	'args': '/srv/wikis/srv/wikis/infowiki/infowiki/maintenance/runJobs.php --wait',
-		# 	'user': 'woodoo',
-		# 	'group': 'woodoo'
+		#	'cmd': 'php-fpm:',
+		#	'args': 'master process (/srv/wikis/etc/php/7.2/fpm/php-fpm.conf)',
+		#	'user': 'woodoo',
+		#	'group': 'woodoo'
 		# }
 		super().__init__(
 			source = source,
 			userName = userName,
 			cmdExact="php",
-			#argEndsWith="runJobs.php",
-			argExact=os.path.join(wikiInstDirPath, "maintenance", "runJobs.php")
+			argEndsWith="/fpm/php-fpm.conf",
 		)
 	#
 
