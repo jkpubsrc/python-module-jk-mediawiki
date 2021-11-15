@@ -89,6 +89,10 @@ class LocalMediaWikisMgr(object):
 	## Public Methods
 	################################################################################################################################
 
+	def getWikiInstDirPath(self, wikiName:str):
+		return self.__wikiScanner.getWikiInstDirPath(wikiName)
+	#
+
 	#
 	# Scan the disk to list all existing Wikis (= running and not running).
 	#

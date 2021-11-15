@@ -397,7 +397,8 @@ with jk_logging.wrapMain() as log:
 
 		# ----
 
-		h = jk_mediawiki.MediaWikiLocalUserInstallationMgr(os.path.join(localMediaWikisMgr.wwwWikiRootDir, wiki), userName, log)
+		_wikiInstDirPath = localMediaWikisMgr.getWikiInstDirPath(wiki)
+		h = jk_mediawiki.MediaWikiLocalUserInstallationMgr(_wikiInstDirPath, userName, log)
 		bIsRunning = h.isCronScriptRunning()
 
 		pidInfos = h.getCronProcesses()
@@ -416,7 +417,8 @@ with jk_logging.wrapMain() as log:
 
 		# ----
 
-		h = jk_mediawiki.MediaWikiLocalUserInstallationMgr(os.path.join(localMediaWikisMgr.wwwWikiRootDir, wiki), userName, log)
+		_wikiInstDirPath = localMediaWikisMgr.getWikiInstDirPath(wiki)
+		h = jk_mediawiki.MediaWikiLocalUserInstallationMgr(_wikiInstDirPath, userName, log)
 
 		pidInfos = h.getCronProcesses()
 		if pidInfos:
@@ -453,7 +455,8 @@ with jk_logging.wrapMain() as log:
 
 		# ----
 
-		h = jk_mediawiki.MediaWikiLocalUserInstallationMgr(os.path.join(localMediaWikisMgr.wwwWikiRootDir, wiki), userName, log)
+		_wikiInstDirPath = localMediaWikisMgr.getWikiInstDirPath(wiki)
+		h = jk_mediawiki.MediaWikiLocalUserInstallationMgr(_wikiInstDirPath, userName, log)
 
 		pidInfos = h.getCronProcesses()
 		if pidInfos:
@@ -474,7 +477,8 @@ with jk_logging.wrapMain() as log:
 
 		# ----
 
-		h = jk_mediawiki.MediaWikiLocalUserInstallationMgr(os.path.join(localMediaWikisMgr.wwwWikiRootDir, wiki), userName, log)
+		_wikiInstDirPath = localMediaWikisMgr.getWikiInstDirPath(wiki)
+		h = jk_mediawiki.MediaWikiLocalUserInstallationMgr(_wikiInstDirPath, userName, log)
 
 		pidInfos = h.getCronProcesses()
 		if pidInfos:
@@ -487,7 +491,8 @@ with jk_logging.wrapMain() as log:
 		allRunningWikis = []
 		for wikiToCheck in wikiNames:
 			if wikiToCheck != wiki:
-				h = jk_mediawiki.MediaWikiLocalUserInstallationMgr(os.path.join(localMediaWikisMgr.wwwWikiRootDir, wiki), userName, log)
+				_wikiInstDirPath = localMediaWikisMgr.getWikiInstDirPath(wiki)
+				h = jk_mediawiki.MediaWikiLocalUserInstallationMgr(_wikiInstDirPath, userName, log)
 				pidInfos = h.getCronProcesses()
 				if pidInfos:
 					allRunningWikis.append(wikiToCheck)
