@@ -5,6 +5,8 @@ __version__ = "0.2021.11.15"
 
 
 
+from .Utils import Utils
+
 from .LocalWikiInstInfo import LocalWikiInstInfo
 from .LocalWikiScanner import LocalWikiScanner
 

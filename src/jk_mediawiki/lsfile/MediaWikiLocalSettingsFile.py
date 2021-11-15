@@ -10,7 +10,7 @@ from jk_utils import *
 from jk_utils.tokenizer import *
 import jk_console
 
-from .impl.lang_support_php import *
+from ..impl.lang_support_php import *
 
 from .MediaWikiLocalSettingsVariableAssignment import MediaWikiLocalSettingsVariableAssignment
 from .MediaWikiLocalSettingsComplexVariableAssignment import MediaWikiLocalSettingsComplexVariableAssignment
@@ -31,12 +31,9 @@ from .MediaWikiLocalSettingsArrayAppend import MediaWikiLocalSettingsArrayAppend
 #
 class MediaWikiLocalSettingsFile(object):
 
-
-
-	# ================================================================================================================================
-	# ==== Constants
-
-
+	################################################################################################################################
+	## Constants
+	################################################################################################################################
 
 	__VALUE_PATTERN = TokenPatternAlternatives([
 		TokenPattern("str1"),
@@ -189,12 +186,9 @@ class MediaWikiLocalSettingsFile(object):
 		TokenPattern("semicolon"),
 	])
 
-
-
-	# ================================================================================================================================
-	# ==== Constructor Methods
-
-
+	################################################################################################################################
+	## Constructor
+	################################################################################################################################
 
 	#
 	# Constructor method.
@@ -206,31 +200,27 @@ class MediaWikiLocalSettingsFile(object):
 		self.__magicVarValues = None
 	#
 
-
-
-	# ================================================================================================================================
-	# ==== Properties
-
-
+	################################################################################################################################
+	## Properties
+	################################################################################################################################
 
 	@property
 	def isChanged(self):
 		return self.__changedFlag.value
 	#
 
-
-
 	@property
 	def isLoaded(self):
 		return self.__data != None
 	#
 
+	################################################################################################################################
+	## Helper Methods
+	################################################################################################################################
 
-
-	# ================================================================================================================================
-	# ==== Methods
-
-
+	################################################################################################################################
+	## Public Methods
+	################################################################################################################################
 
 	#
 	# For debugging purposes only: Write the internal state of this object to STDOUT.
@@ -269,8 +259,6 @@ class MediaWikiLocalSettingsFile(object):
 			print("\t__lines:")
 			table.print(prefix="\t\t")
 	#
-
-
 
 	#
 	# Load a LocalSettings.php file.
@@ -382,8 +370,6 @@ class MediaWikiLocalSettingsFile(object):
 		self.__changedFlag.setChanged(False)
 	#
 
-
-
 	#
 	# Write the file (and all changes applied). If the data has not been loaded from a file calling this method will fail.
 	# In that case use <c>toStr()</c> instead.
@@ -402,8 +388,6 @@ class MediaWikiLocalSettingsFile(object):
 			f.write(self.toStr())
 		self.__changedFlag.setChanged(False)
 	#
-
-
 
 	#
 	# (Re)Generate PHP data from the parsed text.
@@ -427,8 +411,6 @@ class MediaWikiLocalSettingsFile(object):
 				ret.append(item.toPHP())
 		return "".join(ret)
 	#
-
-
 
 	#
 	# (Re)Generate PHP data from the parsed text.
@@ -465,8 +447,6 @@ class MediaWikiLocalSettingsFile(object):
 		return ret
 	#
 
-
-
 	#
 	# Get a variable value.
 	# This method will resolve the value: If it contains magic constants or simple expressions the syntax will be evaluated and the resulting value returned.
@@ -501,8 +481,6 @@ class MediaWikiLocalSettingsFile(object):
 		return None
 	#
 
-
-
 	#
 	# Get a variable value.
 	# This method will resolve the value: If it contains magic constants or simple expressions the syntax will be evaluated and the resulting value returned.
@@ -518,8 +496,6 @@ class MediaWikiLocalSettingsFile(object):
 
 		raise Exception("No such variable: " + repr(varName))
 	#
-
-
 
 	#
 	# Get a variable-like object.
@@ -541,8 +517,6 @@ class MediaWikiLocalSettingsFile(object):
 		return None
 	#
 
-
-
 	def getIndexedVar1(self, varName, indexValue1):
 		assert isinstance(varName, str)
 		assert isinstance(indexValue1, TypedValue)
@@ -556,8 +530,6 @@ class MediaWikiLocalSettingsFile(object):
 
 		return None
 	#
-
-
 
 	def getIndexedVar2(self, varName, indexValue1, indexValue2):
 		assert isinstance(varName, str)
@@ -574,8 +546,6 @@ class MediaWikiLocalSettingsFile(object):
 		return None
 	#
 
-
-
 	def activateWiki(self):
 		v = self.getVar("wgReadOnly")
 		if v is None:
@@ -583,8 +553,6 @@ class MediaWikiLocalSettingsFile(object):
 		else:
 			v.deactivate()
 	#
-
-
 
 	def deactivateWiki(self, text):
 		v = self.getVar("wgReadOnly")
@@ -602,20 +570,15 @@ class MediaWikiLocalSettingsFile(object):
 			v.activate()	# set this line to state "active" if it is commented out
 	#
 
-
-
-	# ================================================================================================================================
-	# ==== Static Methods
-
-
+	################################################################################################################################
+	## Static Methods
+	################################################################################################################################
 
 	@staticmethod
 	def __getType(something):
 		tName = something.__class__.__name__
 		return tName
 	#
-
-
 
 #
 

@@ -12,11 +12,11 @@ import jk_logging
 import jk_typing
 import jk_version
 
-from .Utils import Utils
+from .impl.Utils import Utils
 from .MediaWikiSkinInfo import MediaWikiSkinInfo
 from .MediaWikiDiskUsageInfo import MediaWikiDiskUsageInfo
 from .MediaWikiExtensionInfo import MediaWikiExtensionInfo
-from .MediaWikiLocalSettingsFile import MediaWikiLocalSettingsFile
+from .lsfile.MediaWikiLocalSettingsFile import MediaWikiLocalSettingsFile
 
 
 

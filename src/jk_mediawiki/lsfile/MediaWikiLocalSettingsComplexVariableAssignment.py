@@ -6,7 +6,7 @@ import os
 from jk_utils import *
 from jk_utils.tokenizer import *
 
-from .impl.lang_support_php import *
+from ..impl.lang_support_php import *
 
 
 
@@ -14,35 +14,27 @@ from .impl.lang_support_php import *
 
 
 
-class MediaWikiLocalSettingsVariableAssignment(object):
+class MediaWikiLocalSettingsComplexVariableAssignment(object):
 
 	# ================================================================================================================================
 	# ==== Constructor Methods
 
-	def __init__(self, changedFlag:ChangedFlag, lineNo:int, colNo:int, bIsActive:bool, varName:str, varIndexList:list, value):
+	def __init__(self, changedFlag:ChangedFlag, lineNo:int, colNo:int, bIsActive:bool, varName:str, x:list):
 		assert isinstance(changedFlag, ChangedFlag)
 		assert isinstance(lineNo, int)
 		assert isinstance(colNo, int)
 		assert isinstance(bIsActive, bool)
 		assert isinstance(varName, str)
-		if varIndexList is not None:
-			assert isinstance(varIndexList, list)
-		else:
-			varIndexList = []
-		assert isinstance(value, (TypedValue, list))
-		if isinstance(value, list):
-			for item in value:
-				assert isinstance(item, TypedValue)
-		else:
-			assert isinstance(value, TypedValue)
+		assert isinstance(x, list)
+		for xItem in x:
+			assert isinstance(xItem, TypedValue)
 
 		self.__changedFlag = changedFlag
 		self.__lineNo = lineNo
 		self.__colNo = colNo
 		self.__bIsActive = bIsActive
 		self.__varName = varName
-		self.__varIndexList = varIndexList
-		self.__value = value
+		self.__x = x
 	#
 
 	# ================================================================================================================================
@@ -64,16 +56,6 @@ class MediaWikiLocalSettingsVariableAssignment(object):
 	#
 
 	@property
-	def indexValues(self):
-		return list(self.__varIndexList)
-	#
-
-	@property
-	def value(self):
-		return self.__value
-	#
-
-	@property
 	def isActive(self) -> bool:
 		return self.__bIsActive
 	#
@@ -86,42 +68,17 @@ class MediaWikiLocalSettingsVariableAssignment(object):
 	# ================================================================================================================================
 	# ==== Methods
 
-	def indexValue(self, pos:int):
-		assert isinstance(pos, int)
-
-		if (pos < 0) or (pos >= len(self.__varIndexList)):
-			return None
-		return self.__varIndexList[pos]
-	#
-
-	def setValue(self, value):
-		if value is list:
-			for item in value:
-				assert isinstance(item, TypedValue)
-		else:
-			assert isinstance(value, TypedValue)
-		self.__value = value
-		self.__changedFlag.setChanged(True)
-	#
-
 	def toPHP(self):
 		ret = "" if self.__bIsActive else "#=# "
 		ret += "$" + self.__varName
-		for index in self.__varIndexList:
-			ret += "[" + index.toPHP() + "]"
-		ret += " = "
-		if isinstance(self.__value, list):
-			ret += "array("
-			bNeedComma = False
-			for item in self.__value:
-				if bNeedComma:
-					ret += ","
-				else:
-					bNeedComma = True
-				ret += item.toPHP()
-			ret += ")"
-		else:
-			ret += self.__value.toPHP()
+		ret += " ="
+
+		for xItem in self.__x:
+			if xItem.dataType == "varref":
+				ret += " $" + xItem.value
+			else:
+				ret += " " + xItem.toPHP()
+
 		ret += ";"
 		return ret
 	#
@@ -146,9 +103,56 @@ class MediaWikiLocalSettingsVariableAssignment(object):
 			self.__changedFlag.setChanged(True)
 	#
 
+	#
+	# Use this method to obtain the value of this variable.
+	#
+	# @param		callable getValueCallback		A callback method that can be used to resolve other variables. This is necessary as this is the fundamental concept all this
+	#												implementation here is about: values that are built from complex concatenations of strings.
+	#
+	def getValue(self, getValueCallback) -> str:
+		assert callable(getValueCallback)
+
+		ret = []
+
+		for xItem in self.__x:
+			dataType = xItem.dataType
+			dataValue = xItem.value
+
+			if dataType == "op":
+				continue
+			if dataType == "varref":
+				v = getValueCallback(dataValue)
+				assert isinstance(v, str)
+				ret += v
+			else:
+				assert isinstance(dataValue, str)
+				ret += dataValue
+
+		return "".join(ret)
+	#
+
 	# ================================================================================================================================
 	# ==== Static Methods
 
+	#
+	# Dictionary <c>dataMap</c> contains something like this:
+	#
+	# {
+	# 	"lineNo": 21,
+	#	"colNo": 1,
+	#	"active": True,
+	#	"varName": "wgSQLiteDataDir",
+	#	"x": [
+	#		V(varref: "rootDirPath"),
+	#		V(op: "."),
+	#		V(str1: "/"),
+	#		V(op: "."),
+	#		V(varref: "dirName"),
+	#		V(op: "."),
+	#		V(str1: "db")
+	#	]
+	# }
+	#
 	@staticmethod
 	def parseFromDict(changedFlag:ChangedFlag, dataMap:dict):
 		assert isinstance(changedFlag, ChangedFlag)
@@ -158,23 +162,10 @@ class MediaWikiLocalSettingsVariableAssignment(object):
 		colNo = dataMap["colNo"]
 		bIsActive = dataMap["active"]
 		varName = dataMap["varName"]
-		varType = dataMap["varType"]
-		assert varType in [ "value", "array", "parentDirValue", "fileValue", "dirValue" ]
-		value = dataMap.get("value", None)
-		if value is None:
-			if varType == "array":
-				value = []
-			elif varType == "fileValue":
-				value = TypedValue("magic", "__FILE__")
-			elif varType == "dirValue":
-				value = TypedValue("magic", "__DIR__")
-			elif varType == "parentDirValue":
-				value = TypedValue("magic", "dirname(__DIR__)")
-			else:
-				assert value != None
-		varIndexList = dataMap.get("index", None)
+		x = dataMap["x"]
 
-		return MediaWikiLocalSettingsVariableAssignment(changedFlag, lineNo, colNo, bIsActive, varName, varIndexList, value)
+		ret = MediaWikiLocalSettingsComplexVariableAssignment(changedFlag, lineNo, colNo, bIsActive, varName, x)
+		return ret
 	#
 
 #

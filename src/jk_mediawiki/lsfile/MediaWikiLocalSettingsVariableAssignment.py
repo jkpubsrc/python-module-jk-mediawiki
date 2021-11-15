@@ -6,7 +6,7 @@ import os
 from jk_utils import *
 from jk_utils.tokenizer import *
 
-from .impl.lang_support_php import *
+from ..impl.lang_support_php import *
 
 
 
@@ -14,24 +14,34 @@ from .impl.lang_support_php import *
 
 
 
-class MediaWikiLocalSettingsArrayAppend(object):
+class MediaWikiLocalSettingsVariableAssignment(object):
 
 	# ================================================================================================================================
 	# ==== Constructor Methods
 
-	def __init__(self, changedFlag:ChangedFlag, lineNo:int, colNo:int, bIsActive:bool, varName:str, value):
+	def __init__(self, changedFlag:ChangedFlag, lineNo:int, colNo:int, bIsActive:bool, varName:str, varIndexList:list, value):
 		assert isinstance(changedFlag, ChangedFlag)
 		assert isinstance(lineNo, int)
 		assert isinstance(colNo, int)
 		assert isinstance(bIsActive, bool)
 		assert isinstance(varName, str)
-		assert isinstance(value, TypedValue)
+		if varIndexList is not None:
+			assert isinstance(varIndexList, list)
+		else:
+			varIndexList = []
+		assert isinstance(value, (TypedValue, list))
+		if isinstance(value, list):
+			for item in value:
+				assert isinstance(item, TypedValue)
+		else:
+			assert isinstance(value, TypedValue)
 
 		self.__changedFlag = changedFlag
 		self.__lineNo = lineNo
 		self.__colNo = colNo
 		self.__bIsActive = bIsActive
 		self.__varName = varName
+		self.__varIndexList = varIndexList
 		self.__value = value
 	#
 
@@ -54,6 +64,11 @@ class MediaWikiLocalSettingsArrayAppend(object):
 	#
 
 	@property
+	def indexValues(self):
+		return list(self.__varIndexList)
+	#
+
+	@property
 	def value(self):
 		return self.__value
 	#
@@ -71,8 +86,20 @@ class MediaWikiLocalSettingsArrayAppend(object):
 	# ================================================================================================================================
 	# ==== Methods
 
+	def indexValue(self, pos:int):
+		assert isinstance(pos, int)
+
+		if (pos < 0) or (pos >= len(self.__varIndexList)):
+			return None
+		return self.__varIndexList[pos]
+	#
+
 	def setValue(self, value):
-		assert isinstance(value, TypedValue)
+		if value is list:
+			for item in value:
+				assert isinstance(item, TypedValue)
+		else:
+			assert isinstance(value, TypedValue)
 		self.__value = value
 		self.__changedFlag.setChanged(True)
 	#
@@ -80,8 +107,21 @@ class MediaWikiLocalSettingsArrayAppend(object):
 	def toPHP(self):
 		ret = "" if self.__bIsActive else "#=# "
 		ret += "$" + self.__varName
-		ret += "[] = "
-		ret += self.__value.toPHP()
+		for index in self.__varIndexList:
+			ret += "[" + index.toPHP() + "]"
+		ret += " = "
+		if isinstance(self.__value, list):
+			ret += "array("
+			bNeedComma = False
+			for item in self.__value:
+				if bNeedComma:
+					ret += ","
+				else:
+					bNeedComma = True
+				ret += item.toPHP()
+			ret += ")"
+		else:
+			ret += self.__value.toPHP()
 		ret += ";"
 		return ret
 	#
@@ -119,14 +159,29 @@ class MediaWikiLocalSettingsArrayAppend(object):
 		bIsActive = dataMap["active"]
 		varName = dataMap["varName"]
 		varType = dataMap["varType"]
-		assert varType == "value"
-		value = dataMap["value"]
-		assert isinstance(value, TypedValue)
+		assert varType in [ "value", "array", "parentDirValue", "fileValue", "dirValue" ]
+		value = dataMap.get("value", None)
+		if value is None:
+			if varType == "array":
+				value = []
+			elif varType == "fileValue":
+				value = TypedValue("magic", "__FILE__")
+			elif varType == "dirValue":
+				value = TypedValue("magic", "__DIR__")
+			elif varType == "parentDirValue":
+				value = TypedValue("magic", "dirname(__DIR__)")
+			else:
+				assert value != None
+		varIndexList = dataMap.get("index", None)
 
-		return MediaWikiLocalSettingsArrayAppend(changedFlag, lineNo, colNo, bIsActive, varName, value)
+		return MediaWikiLocalSettingsVariableAssignment(changedFlag, lineNo, colNo, bIsActive, varName, varIndexList, value)
 	#
 
 #
+
+
+
+
 
 
 
