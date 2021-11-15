@@ -337,6 +337,7 @@ class MediaWikiLocalUserInstallationMgr(object):
 		for x in self.__findProcess(
 				userName=self.__userName,
 				cmdExact="php",
+				argEndsWith="runJobs.php",
 				argExact=os.path.join(self.__wikiInstDirPath, "maintenance", "runJobs.php")
 			):
 
