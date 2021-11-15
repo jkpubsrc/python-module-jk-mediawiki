@@ -46,6 +46,7 @@ setup(
 	name = "jk_mediawiki",
 	packages = [
 		"jk_mediawiki",
+		"jk_mediawiki.impl",
 	],
 	scripts = [
 		"bin/wikilocalctrl.py",
