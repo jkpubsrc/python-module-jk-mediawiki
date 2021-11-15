@@ -10,7 +10,7 @@ from jk_utils import *
 from jk_utils.tokenizer import *
 import jk_console
 
-from .lang_support_php import *
+from .impl.lang_support_php import *
 
 from .MediaWikiLocalSettingsVariableAssignment import MediaWikiLocalSettingsVariableAssignment
 from .MediaWikiLocalSettingsComplexVariableAssignment import MediaWikiLocalSettingsComplexVariableAssignment

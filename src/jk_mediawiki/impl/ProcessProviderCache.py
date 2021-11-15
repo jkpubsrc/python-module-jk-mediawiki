@@ -4,7 +4,7 @@ import os
 import typing
 
 import jk_typing
-import jk_sysinfo
+import jk_cachefunccalls
 
 from .AbstractProcessFilter import AbstractProcessFilter
 
@@ -13,7 +13,7 @@ from .AbstractProcessFilter import AbstractProcessFilter
 
 
 
-class OSProcessProvider(AbstractProcessFilter):
+class ProcessProviderCache(AbstractProcessFilter):
 
 	################################################################################################################################
 	## Constructor
@@ -23,8 +23,8 @@ class OSProcessProvider(AbstractProcessFilter):
 	# Constructor method.
 	#
 	@jk_typing.checkFunctionSignature()
-	def __init__(self):
-		pass
+	def __init__(self, source:AbstractProcessFilter):
+		self.__source = source
 	#
 
 	################################################################################################################################
@@ -39,21 +39,9 @@ class OSProcessProvider(AbstractProcessFilter):
 	## Public Methods
 	################################################################################################################################
 
+	@jk_cachefunccalls.cacheCalls(seconds=3)
 	def listProcesses(self) -> typing.List[dict]:
-		ret = []
-
-		# enrich the data dictionaries
-
-		for x in jk_sysinfo.get_ps():
-			if "args" in x:
-				# naive splitting at spaces, regardless of the exact nature of the command line
-				x["args_list"] = [ a.strip() for a in x["args"].split() ]
-			else:
-				# no arguments => empty list
-				x["args_list"] = []
-			ret.append(x)
-
-		return ret
+		return self.__source.listProcesses()
 	#
 
 #
