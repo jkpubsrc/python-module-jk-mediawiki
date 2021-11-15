@@ -296,17 +296,19 @@ class MediaWikiLocalSettingsFile(object):
 	# @param	str filePath		The file path of the MediaWiki "LocalSettings.php" file.
 	# @param	str rawText			The raw file content of a "LocalSettings.php" file.
 	#
-	def load(self, dirPath = None, filePath = None, rawText:str = None):
+	def load(self, dirPath = None, filePath = None, rawText:str = None):			# TODO: add logging
 		if rawText is not None:
 			assert isinstance(rawText, str)
 			filePath = None
 		elif filePath is not None:
 			assert isinstance(filePath, str)
+			# TODO: add logging
 			with codecs.open(filePath, "r", "utf-8") as f:
 				rawText = f.read()
 		elif dirPath is not None:
 			assert isinstance(dirPath, str)
 			filePath = os.path.join(dirPath, "LocalSettings.php")
+			# TODO: add logging
 			with codecs.open(filePath, "r", "utf-8") as f:
 				rawText = f.read()
 		else:

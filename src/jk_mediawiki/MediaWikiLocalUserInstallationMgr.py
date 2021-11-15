@@ -67,10 +67,11 @@ class MediaWikiLocalUserInstallationMgr(object):
 	#										Additionally there must be a cron script named "<sitename>cron.sh".
 	# @param	str userName				(required) The name of the user account under which NGINX, PHP and the Wiki cron process are executed.
 	#
-	@jk_typing.checkFunctionSignature()
+	@jk_typing.checkFunctionSignature(logDescend="Analyzing MediaWiki installation at: {mediaWikiDirPath}")
 	def __init__(self,
 			mediaWikiDirPath:str,
 			userName:str,
+			log:jk_logging.AbstractLogger,
 		):
 
 		# store and process the account name the system processes are running under
@@ -90,7 +91,7 @@ class MediaWikiLocalUserInstallationMgr(object):
 		self.__wikiDirPath = mediaWikiDirPath
 
 		mwLocalSettings = MediaWikiLocalSettingsFile()
-		mwLocalSettings.load(dirPath = mediaWikiDirPath)
+		mwLocalSettings.load(dirPath = mediaWikiDirPath)		# TODO: add logging
 
 		#mwLocalSettings.dump()			# DEBUG
 

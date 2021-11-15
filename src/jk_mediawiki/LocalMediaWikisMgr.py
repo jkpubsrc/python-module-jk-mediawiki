@@ -117,7 +117,7 @@ class LocalMediaWikisMgr(object):
 
 		for wikiInst in wikiInsts:
 			with log.descend("Checking wiki: " + wikiInst.name) as log2:
-				h = jk_mediawiki.MediaWikiLocalUserInstallationMgr(wikiInst.instDirPath, self.__userName)
+				h = jk_mediawiki.MediaWikiLocalUserInstallationMgr(wikiInst.instDirPath, self.__userName, log2)
 				bIsRunning = h.isCronScriptRunning()
 				c = jk_console.Console.ForeGround.STD_GREEN if bIsRunning else jk_console.Console.ForeGround.STD_DARKGRAY
 				smVersion = h.getSMWVersion()
@@ -158,7 +158,7 @@ class LocalMediaWikisMgr(object):
 
 		wikiInsts = self.__wikiScanner.wikis
 		wikiNames = [ wikiInst.name for wikiInst in wikiInsts ]
-		wikis = [ jk_mediawiki.MediaWikiLocalUserInstallationMgr(wikiInst.instDirPath, self.__userName) for wikiInst in wikiInsts ]
+		wikis = [ jk_mediawiki.MediaWikiLocalUserInstallationMgr(wikiInst.instDirPath, self.__userName, log) for wikiInst in wikiInsts ]
 		wikiExtensionInfos = []
 
 		allExtensionNames = set()
