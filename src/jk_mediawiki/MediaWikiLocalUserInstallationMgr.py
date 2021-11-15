@@ -287,7 +287,12 @@ class MediaWikiLocalUserInstallationMgr(object):
 			raise Exception("Starting cron process failed!")
 	#
 
-	def __findProcess(self, userName=None, cmdExact=None):
+	def __findProcess(self,
+			userName:str = None,
+			cmdExact:str = None,
+			argEndsWith:str = None
+		):
+
 		processList = jk_sysinfo.get_ps()
 		for x in processList:
 
@@ -303,6 +308,17 @@ class MediaWikiLocalUserInstallationMgr(object):
 				if x["cmd"] != cmdExact:
 					continue
 
+			# filter by argument
+			if argEndsWith:
+				bFound = False
+				for arg in x["args"].split(" "):
+					arg = arg.strip()
+					if arg.endswith(argEndsWith):
+						bFound = True
+						break
+				if not bFound:
+					continue
+
 			yield x
 	#
 
@@ -316,7 +332,7 @@ class MediaWikiLocalUserInstallationMgr(object):
 		processList = jk_sysinfo.get_ps()
 
 		bashProcess = None
-		for x in self.__findProcess(userName=self.__userName, cmdExact="php"):
+		for x in self.__findProcess(userName=self.__userName, cmdExact="php", argEndsWith="/runJobs.php"):
 			print(x)
 			if not x["cmd"] == "/bin/bash":
 				continue
