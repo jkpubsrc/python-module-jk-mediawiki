@@ -48,7 +48,7 @@ class MediaWikiLocalUserInstallationMgr(object):
 	################################################################################################################################
 
 	# @field		str __userName					The name of the user account under which NGINX, PHP and the Wiki cron process are executed.
-	# @field		str __wikiDirPath				The absolute directory path where the MediaWiki installation can be found.
+	# @field		str __wikiInstDirPath				The absolute directory path where the MediaWiki installation can be found.
 	# @field		str __wikiDirName				The name of the directory the Wiki resides in
 	# @field		str __wikiDBDirPath				The directory where all the databases are stored
 	# @field		str __cronScriptFilePath		The path of the cron script file
@@ -62,14 +62,14 @@ class MediaWikiLocalUserInstallationMgr(object):
 	#
 	# Configuration parameters:
 	#
-	# @param	str mediaWikiDirPath		(required) The absolute directory path where the MediaWiki installation can be found.
+	# @param	str mediaWikiInstDirPath	(required) The absolute directory path where the MediaWiki installation can be found.
 	#										The final directory name in the path must be the same as the site name of the Wiki.
 	#										Additionally there must be a cron script named "<sitename>cron.sh".
 	# @param	str userName				(required) The name of the user account under which NGINX, PHP and the Wiki cron process are executed.
 	#
-	@jk_typing.checkFunctionSignature(logDescend="Analyzing MediaWiki installation at: {mediaWikiDirPath}")
+	@jk_typing.checkFunctionSignature(logDescend="Analyzing MediaWiki installation at: {mediaWikiInstDirPath}")
 	def __init__(self,
-			mediaWikiDirPath:str,
+			mediaWikiInstDirPath:str,
 			userName:str,
 			log:jk_logging.AbstractLogger,
 		):
@@ -83,15 +83,15 @@ class MediaWikiLocalUserInstallationMgr(object):
 
 		# check MediaWiki installation directory and load settings
 
-		assert isinstance(mediaWikiDirPath, str)
-		assert mediaWikiDirPath
-		assert os.path.isdir(mediaWikiDirPath)
-		assert os.path.isabs(mediaWikiDirPath)
+		assert isinstance(mediaWikiInstDirPath, str)
+		assert mediaWikiInstDirPath
+		assert os.path.isdir(mediaWikiInstDirPath)
+		assert os.path.isabs(mediaWikiInstDirPath)
 
-		self.__wikiDirPath = mediaWikiDirPath
+		self.__wikiInstDirPath = mediaWikiInstDirPath
 
 		mwLocalSettings = MediaWikiLocalSettingsFile()
-		mwLocalSettings.load(dirPath = mediaWikiDirPath)		# TODO: add logging
+		mwLocalSettings.load(dirPath = mediaWikiInstDirPath)		# TODO: add logging
 
 		#mwLocalSettings.dump()			# DEBUG
 
@@ -110,24 +110,24 @@ class MediaWikiLocalUserInstallationMgr(object):
 		else:
 			raise NotImplementedError("Backup of database not (yet) supported: " + dbType)
 
-		self.__wikiDirName = os.path.basename(mediaWikiDirPath)
+		self.__wikiDirName = os.path.basename(mediaWikiInstDirPath)
 		if self.__wikiDirName.lower() != wikiSiteName.lower():
 			raise Exception("Installation directory name does not match the MediaWiki site name! ("
 				+ repr(self.__wikiDirName) + " vs. " + repr(wikiSiteName) + ")")
 
-		self.__wikiBaseDirPath = os.path.dirname(mediaWikiDirPath)
+		self.__wikiBaseDirPath = os.path.dirname(mediaWikiInstDirPath)
 
 		# wiki background task script
 
 		expectedCronScriptFileName = self.__wikiDirName + "cron.sh"
-		p = os.path.join(os.path.dirname(self.__wikiDirPath), expectedCronScriptFileName)
+		p = os.path.join(os.path.dirname(self.__wikiInstDirPath), expectedCronScriptFileName)
 		if os.path.isfile(p):
 			self.__cronScriptFilePath = p
 		else:
 			raise Exception("No cron script: " + repr(expectedCronScriptFileName))
 
 		expectedStartCronScriptFileName = self.__wikiDirName + "cron-bg.sh"
-		p = os.path.join(os.path.dirname(self.__wikiDirPath), expectedStartCronScriptFileName)
+		p = os.path.join(os.path.dirname(self.__wikiInstDirPath), expectedStartCronScriptFileName)
 		if os.path.isfile(p):
 			self.__startCronScriptFilePath = p
 		else:
@@ -143,7 +143,7 @@ class MediaWikiLocalUserInstallationMgr(object):
 
 	@property
 	def wikiLocalSettingsFilePath(self) -> str:
-		filePath = os.path.join(self.__wikiDirPath, "LocalSettings.php")
+		filePath = os.path.join(self.__wikiInstDirPath, "LocalSettings.php")
 		if os.path.isfile(filePath):
 			return filePath
 		else:
@@ -153,7 +153,7 @@ class MediaWikiLocalUserInstallationMgr(object):
 
 	@property
 	def wikiExtensionsDirPath(self) -> str:
-		wikiExtensionsDirPath = os.path.join(self.__wikiDirPath, "extensions")
+		wikiExtensionsDirPath = os.path.join(self.__wikiInstDirPath, "extensions")
 		if os.path.isdir(wikiExtensionsDirPath):
 			return wikiExtensionsDirPath
 		else:
@@ -176,7 +176,7 @@ class MediaWikiLocalUserInstallationMgr(object):
 	#
 	@property
 	def wikiDirPath(self) -> str:
-		return self.__wikiDirPath
+		return self.__wikiInstDirPath
 	#
 
 	#
@@ -228,7 +228,7 @@ class MediaWikiLocalUserInstallationMgr(object):
 	def getSkinInfos(self, log:jk_logging.AbstractLogger = None) -> typing.List[MediaWikiSkinInfo]:
 		ret = []
 
-		for fe in os.scandir(os.path.join(self.__wikiDirPath, "skins")):
+		for fe in os.scandir(os.path.join(self.__wikiInstDirPath, "skins")):
 			if fe.is_dir():
 
 				if log:
@@ -261,7 +261,7 @@ class MediaWikiLocalUserInstallationMgr(object):
 	#
 	def loadMediaWikiLocalSettingsFile(self) -> MediaWikiLocalSettingsFile:
 		mwLocalSettings = MediaWikiLocalSettingsFile()
-		mwLocalSettings.load(dirPath = self.__wikiDirPath)
+		mwLocalSettings.load(dirPath = self.__wikiInstDirPath)
 		return mwLocalSettings
 	#
 
@@ -332,7 +332,12 @@ class MediaWikiLocalUserInstallationMgr(object):
 		processList = jk_sysinfo.get_ps()
 
 		bashProcess = None
-		for x in self.__findProcess(userName=self.__userName, cmdExact="php", argEndsWith="/runJobs.php"):
+		for x in self.__findProcess(
+				userName=self.__userName,
+				cmdExact="php",
+				argEndsWith=os.path.join(self.__wikiInstDirPath, "maintenance", "runJobs.php")
+			):
+
 			print(x)
 			if not x["cmd"] == "/bin/bash":
 				continue
@@ -357,14 +362,14 @@ class MediaWikiLocalUserInstallationMgr(object):
 
 	def getVersion(self) -> jk_version.Version:
 		lookingForFilePrefix = "RELEASE-NOTES-"
-		for entry in os.scandir(self.__wikiDirPath):
+		for entry in os.scandir(self.__wikiInstDirPath):
 			if entry.is_file() and entry.name.startswith(lookingForFilePrefix):
 				return jk_version.Version(entry.name[len(lookingForFilePrefix):])
 		raise Exception("Can't determine version!")
 	#
 
 	def getSMWVersion(self) -> typing.Union[jk_version.Version,None]:
-		p = os.path.join(self.__wikiDirPath, "extensions", "SemanticMediaWiki", "extension.json")
+		p = os.path.join(self.__wikiInstDirPath, "extensions", "SemanticMediaWiki", "extension.json")
 		if os.path.isfile(p):
 			j = jk_json.loadFromFile(p)
 			return jk_version.Version(j["version"])
@@ -411,7 +416,7 @@ class MediaWikiLocalUserInstallationMgr(object):
 	def getLastUseTimeStamp(self) -> typing.Union[datetime.datetime,None]:
 		t = -1
 
-		dirPaths = [ self.__wikiDirPath ]
+		dirPaths = [ self.__wikiInstDirPath ]
 		if self.__wikiDBDirPath:
 			dirPaths.append(self.__wikiDBDirPath)
 
@@ -447,7 +452,7 @@ class MediaWikiLocalUserInstallationMgr(object):
 	def getExtensionInfos(self, log:jk_logging.AbstractLogger = None) -> typing.List[MediaWikiExtensionInfo]:
 		ret = []
 
-		for fe in os.scandir(os.path.join(self.__wikiDirPath, "extensions")):
+		for fe in os.scandir(os.path.join(self.__wikiInstDirPath, "extensions")):
 			if fe.is_dir():
 
 				if log:
@@ -472,13 +477,13 @@ class MediaWikiLocalUserInstallationMgr(object):
 	#
 
 	def getDiskUsage(self) -> MediaWikiDiskUsageInfo:
-		sizeCache = Utils.getDiskSpaceRecursively(os.path.join(self.__wikiDirPath, "cache"))
-		sizeImages = Utils.getDiskSpaceRecursively(os.path.join(self.__wikiDirPath, "images"))
-		sizeExtensions = Utils.getDiskSpaceRecursively(os.path.join(self.__wikiDirPath, "extensions"))
+		sizeCache = Utils.getDiskSpaceRecursively(os.path.join(self.__wikiInstDirPath, "cache"))
+		sizeImages = Utils.getDiskSpaceRecursively(os.path.join(self.__wikiInstDirPath, "images"))
+		sizeExtensions = Utils.getDiskSpaceRecursively(os.path.join(self.__wikiInstDirPath, "extensions"))
 		sizeDatabase = Utils.getDiskSpaceRecursively(self.__wikiDBDirPath)
 
 		sizeCore = 0
-		for fe in os.scandir(self.__wikiDirPath):
+		for fe in os.scandir(self.__wikiInstDirPath):
 			if fe.is_symlink():
 				continue
 			elif fe.is_file():
