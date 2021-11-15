@@ -290,7 +290,8 @@ class MediaWikiLocalUserInstallationMgr(object):
 	def __findProcess(self,
 			userName:str = None,
 			cmdExact:str = None,
-			argEndsWith:str = None
+			argEndsWith:str = None,
+			argExact:str = None,
 		):
 
 		processList = jk_sysinfo.get_ps()
@@ -309,7 +310,8 @@ class MediaWikiLocalUserInstallationMgr(object):
 					continue
 
 			# filter by argument
-			if argEndsWith:
+			if argEndsWith or argExact:
+				print("--", argExact)
 				bFound = False
 				for arg in x["args"].split(" "):
 					arg = arg.strip()
@@ -335,7 +337,7 @@ class MediaWikiLocalUserInstallationMgr(object):
 		for x in self.__findProcess(
 				userName=self.__userName,
 				cmdExact="php",
-				argEndsWith=os.path.join(self.__wikiInstDirPath, "maintenance", "runJobs.php")
+				argExact=os.path.join(self.__wikiInstDirPath, "maintenance", "runJobs.php")
 			):
 
 			print(x)
