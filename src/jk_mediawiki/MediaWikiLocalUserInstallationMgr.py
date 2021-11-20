@@ -16,7 +16,15 @@ from .impl.Utils import Utils
 from .MediaWikiSkinInfo import MediaWikiSkinInfo
 from .MediaWikiDiskUsageInfo import MediaWikiDiskUsageInfo
 from .MediaWikiExtensionInfo import MediaWikiExtensionInfo
+from .MWManagementCtx import MWManagementCtx
 from .lsfile.MediaWikiLocalSettingsFile import MediaWikiLocalSettingsFile
+from .impl.AbstractProcessFilter import AbstractProcessFilter
+from .impl.OSProcessProvider import OSProcessProvider
+from .impl.ProcessProviderCache import ProcessProviderCache
+from .impl.ProcessFilter import ProcessFilter
+from .impl.WikiCronProcessFilter import WikiCronProcessFilter
+from .impl.WikiNGINXProcessFilter import WikiNGINXProcessFilter
+from .impl.WikiPHPProcessFilter import WikiPHPProcessFilter
 
 
 
@@ -54,7 +62,8 @@ class MediaWikiLocalUserInstallationMgr(object):
 	# @field		str __cronScriptFilePath		The path of the cron script file
 	# @field		str __cronScriptDirPath			For convenience: The directory where the cron script file resides in
 	# @field		str __cronScriptFileName		For convenience: The name of the cron script file without it's parent directory information
-
+	# @field		OSProcessProvider __osProcessProvider			A direct operating system process provider
+	# @field		ProcessProviderCache __cachedOSProcessProvider	A cached operating system process provider
 	################################################################################################################################
 	## Constructor
 	################################################################################################################################
@@ -62,24 +71,19 @@ class MediaWikiLocalUserInstallationMgr(object):
 	#
 	# Configuration parameters:
 	#
-	# @param	str mediaWikiInstDirPath	(required) The absolute directory path where the MediaWiki installation can be found.
-	#										The final directory name in the path must be the same as the site name of the Wiki.
-	#										Additionally there must be a cron script named "<sitename>cron.sh".
-	# @param	str userName				(required) The name of the user account under which NGINX, PHP and the Wiki cron process are executed.
+	# @param	MWManagementCtx ctx							A management context that provides common data.
+	# @param	str mediaWikiInstDirPath					(required) The absolute directory path where the MediaWiki installation can be found.
+	#														The final directory name in the path must be the same as the site name of the Wiki.
+	#														Additionally there must be a cron script named "<sitename>cron.sh".
 	#
 	@jk_typing.checkFunctionSignature(logDescend="Analyzing MediaWiki installation at: {mediaWikiInstDirPath}")
 	def __init__(self,
+			ctx:MWManagementCtx,
 			mediaWikiInstDirPath:str,
-			userName:str,
 			log:jk_logging.AbstractLogger,
 		):
 
-		# store and process the account name the system processes are running under
-
-		assert isinstance(userName, str)
-		assert userName
-
-		self.__userName = userName
+		self.__ctx = ctx
 
 		# check MediaWiki installation directory and load settings
 
@@ -89,6 +93,11 @@ class MediaWikiLocalUserInstallationMgr(object):
 		assert os.path.isabs(mediaWikiInstDirPath)
 
 		self.__wikiInstDirPath = mediaWikiInstDirPath
+
+		assert os.path.isdir(self.wikiExtensionsDirPath)
+		assert os.path.isdir(self.wikiImagesDirPath)
+		assert os.path.isdir(self.wikiSkinsDirPath)
+		assert os.path.isfile(self.wikiLocalSettingsFilePath)
 
 		mwLocalSettings = MediaWikiLocalSettingsFile()
 		mwLocalSettings.load(dirPath = mediaWikiInstDirPath)		# TODO: add logging
@@ -138,11 +147,11 @@ class MediaWikiLocalUserInstallationMgr(object):
 	#
 
 	################################################################################################################################
-	## Properties
+	## Public Properties
 	################################################################################################################################
 
 	@property
-	def wikiLocalSettingsFilePath(self) -> str:
+	def wikiLocalSettingsFilePath(self) -> typing.Union[str,None]:
 		filePath = os.path.join(self.__wikiInstDirPath, "LocalSettings.php")
 		if os.path.isfile(filePath):
 			return filePath
@@ -152,12 +161,32 @@ class MediaWikiLocalUserInstallationMgr(object):
 	#
 
 	@property
-	def wikiExtensionsDirPath(self) -> str:
-		wikiExtensionsDirPath = os.path.join(self.__wikiInstDirPath, "extensions")
-		if os.path.isdir(wikiExtensionsDirPath):
-			return wikiExtensionsDirPath
+	def wikiExtensionsDirPath(self) -> typing.Union[str,None]:
+		ret = os.path.join(self.__wikiInstDirPath, "extensions")
+		if os.path.isdir(ret):
+			return ret
 		else:
-			#raise Exception("No such directory:" + wikiExtensionsDirPath)
+			#raise Exception("No such directory:" + ret)
+			return None
+	#
+
+	@property
+	def wikiSkinsDirPath(self) -> typing.Union[str,None]:
+		ret = os.path.join(self.__wikiInstDirPath, "skins")
+		if os.path.isdir(ret):
+			return ret
+		else:
+			#raise Exception("No such directory:" + ret)
+			return None
+	#
+
+	@property
+	def wikiImagesDirPath(self) -> typing.Union[str,None]:
+		ret = os.path.join(self.__wikiInstDirPath, "images")
+		if os.path.isdir(ret):
+			return ret
+		else:
+			#raise Exception("No such directory:" + ret)
 			return None
 	#
 
@@ -211,6 +240,15 @@ class MediaWikiLocalUserInstallationMgr(object):
 	## Helper Methods
 	################################################################################################################################
 
+	@jk_typing.checkFunctionSignature()
+	def __newMWCronProcessFilter(self, wikiInstDirPath:str = None) -> AbstractProcessFilter:
+		return WikiCronProcessFilter(
+			userName=self.__ctx.currentUserName,
+			wikiInstDirPath=wikiInstDirPath,
+			source=self.__ctx.osProcessProvider
+		)
+	#
+
 	################################################################################################################################
 	## Public Methods
 	################################################################################################################################
@@ -257,7 +295,7 @@ class MediaWikiLocalUserInstallationMgr(object):
 	#
 
 	#
-	# Load the MediaWiki file "LocalSettings.php" and return it.
+	# (Re)load the MediaWiki file "LocalSettings.php" and return it.
 	#
 	def loadMediaWikiLocalSettingsFile(self) -> MediaWikiLocalSettingsFile:
 		mwLocalSettings = MediaWikiLocalSettingsFile()
@@ -269,6 +307,7 @@ class MediaWikiLocalUserInstallationMgr(object):
 		processes = self.getCronProcesses()
 		if processes:
 			log.info("Now stopping cron background processes: " + str([ x["pid"] for x in processes ]))
+			self.__osProcessProvider.invalidate()
 			if not jk_utils.processes.killProcesses(processes, log):
 				raise Exception("There were errors stopping the cron background script!")
 		else:
@@ -278,8 +317,9 @@ class MediaWikiLocalUserInstallationMgr(object):
 	def startCronScript(self, log = None):
 		if self.getCronProcesses() is not None:
 			raise Exception("Cron process already running!")
+		self.__osProcessProvider.invalidate()
 		if not jk_utils.processes.runProcessAsOtherUser(
-				accountName=self.__userName,
+				accountName=self.__ctx.currentUserName,
 				filePath=self.__startCronScriptFilePath,
 				args=None,
 				log=log
@@ -290,40 +330,24 @@ class MediaWikiLocalUserInstallationMgr(object):
 	#
 	# Returns the master and child processes of the cron script.
 	#
-	def getCronProcesses(self) -> typing.Union[list, None]:
+	@jk_typing.checkFunctionSignature()
+	def getCronProcesses(self) -> typing.Union[typing.List[dict],None]:
 		if self.__cronScriptDirPath is None:
 			return None
 
-		processList = jk_sysinfo.get_ps()
-
-		bashProcess = None
-		for x in self.__findProcess(
-				userName=self.__userName,
-				cmdExact="php",
-				argEndsWith="runJobs.php",
-				argExact=os.path.join(self.__wikiInstDirPath, "maintenance", "runJobs.php")
-			):
-
-			print(x)
-			if not x["cmd"] == "/bin/bash":
-				continue
-			if "cwd" not in x:
-				continue
-			if x["cwd"] != self.__cronScriptDirPath:
-				continue
-			if ("args" not in x) or (x["args"].find(self.__cronScriptFileName) < 0):
-				continue
-			bashProcess = x
-
-		if bashProcess is None:
+		processList = self.__newMWCronProcessFilter(self.__wikiInstDirPath)()
+		if not processList:
 			return None
 
-		ret = [ bashProcess ]
-		for x in processList:
-			if x["ppid"] == bashProcess["pid"]:
-				ret.append(x)
+		return processList
+	#
 
-		return ret
+	@jk_typing.checkFunctionSignature()
+	def getCronProcessesProvider(self) -> typing.Union[AbstractProcessFilter,None]:
+		if self.__cronScriptDirPath is None:
+			return None
+
+		return self.__newMWCronProcessFilter(self.__wikiInstDirPath)
 	#
 
 	def getVersion(self) -> jk_version.Version:

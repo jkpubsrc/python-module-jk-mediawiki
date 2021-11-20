@@ -1,23 +1,27 @@
 
 
 
-
-
-
-
+import sys
 import os
 import typing
+import getpass
 
 import jk_typing
+import jk_utils
+import jk_logging
+import jk_json
+import jk_prettyprintobj
 
-from .ProcessFilter import ProcessFilter
+from .impl.ProcessProviderCache import ProcessProviderCache
+from .impl.OSProcessProvider import OSProcessProvider
 
 
 
 
 
 
-class WikiCronProcessFilter(ProcessFilter):
+
+class MWManagementCtx(object):
 
 	################################################################################################################################
 	## Constructor
@@ -27,26 +31,11 @@ class WikiCronProcessFilter(ProcessFilter):
 	# Constructor method.
 	#
 	@jk_typing.checkFunctionSignature()
-	def __init__(self, userName:str, wikiInstDirPath:typing.Union[str,None], source:typing.Callable):
-		# {
-		#	'ppid': 21827,
-		#	'pid': 21841,
-		#	'tty': 'pts/7',
-		#	'stat': 'S',
-		#	'uid': 1000,
-		#	'gid': 1000,
-		#	'cmd': 'php',
-		#	'args': '/srv/wikis/srv/wikis/infowiki/infowiki/maintenance/runJobs.php --wait',
-		# 	'user': 'woodoo',
-		# 	'group': 'woodoo'
-		# }
-		super().__init__(
-			source = source,
-			userName = userName,
-			cmdExact="php",
-			#argEndsWith="runJobs.php",
-			argExact=os.path.join(wikiInstDirPath, "maintenance", "runJobs.php") if wikiInstDirPath else None
-		)
+	def __init__(self):
+		self.__userPID = os.getuid()
+		self.__userName = getpass.getuser()
+		self.__osProcessProvider = ProcessProviderCache(OSProcessProvider())
+		self.__homeDir = os.environ["HOME"]
 	#
 
 	################################################################################################################################
@@ -57,15 +46,46 @@ class WikiCronProcessFilter(ProcessFilter):
 	## Helper Methods
 	################################################################################################################################
 
+	@property
+	def cfgFilePath(self) -> str:
+		return os.path.join(self.__homeDir, ".config/wikilocalctrl.json")
+	#
+
+	@property
+	def homeDir(self) -> str:
+		return self.__homeDir
+	#
+
+	#
+	# A (cachable) provider for processes.
+	#
+	@property
+	def osProcessProvider(self) -> ProcessProviderCache:
+		return self.__osProcessProvider
+	#
+
+	#
+	# The name of the user account under which NGINX, PHP and the Wiki cron process are executed.
+	#
+	@property
+	def currentUserName(self) -> str:
+		return self.__userName
+	#
+
+	@property
+	def currentUserPID(self) -> int:
+		return self.__userPID
+	#
+
 	################################################################################################################################
 	## Public Methods
 	################################################################################################################################
 
-	def invalidate(self):
-		self.__source.invalidate()
-	#
-
 #
+
+
+
+
 
 
 

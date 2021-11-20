@@ -56,6 +56,10 @@ class OSProcessProvider(AbstractProcessFilter):
 		return ret
 	#
 
+	def invalidate(self):
+		pass
+	#
+
 #
 
 

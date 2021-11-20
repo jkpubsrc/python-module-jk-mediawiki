@@ -3,7 +3,6 @@
 import time
 import datetime
 import os
-import getpass
 import sys
 import typing
 
@@ -15,6 +14,10 @@ import jk_typing
 import jk_console
 import jk_mounting
 import jk_sysinfo
+
+from jk_mediawiki.MWManagementCtx import MWManagementCtx
+from jk_mediawiki.impl.AbstractProcessFilter import AbstractProcessFilter
+
 
 
 
@@ -96,13 +99,14 @@ def getHttpdCfg(cfg:dict) -> tuple:
 	return startNGINXScriptPath, startPHPFPMScriptPath, cfg["wikiEtcDir"]
 #
 
-def instantiateLocalUserServiceMgr(cfg:dict, userName:str, bVerbose:bool) -> jk_mediawiki.MediaWikiLocalUserServiceMgr:
+@jk_typing.checkFunctionSignature()
+def instantiateLocalUserServiceMgr(ctx:MWManagementCtx, cfg:dict, bVerbose:bool) -> jk_mediawiki.MediaWikiLocalUserServiceMgr:
 	startNGINXScriptPath, startPHPFPMScriptPath, wikiEtcDirPath = getHttpdCfg(cfg)
-	return jk_mediawiki.MediaWikiLocalUserServiceMgr(startNGINXScriptPath, startPHPFPMScriptPath, wikiEtcDirPath, userName, bVerbose)
+	return jk_mediawiki.MediaWikiLocalUserServiceMgr(ctx, startNGINXScriptPath, startPHPFPMScriptPath, wikiEtcDirPath, bVerbose)
 #
 
 @jk_typing.checkFunctionSignature()
-def waitForServiceStarted(fnGetPIDInfos, name:str, log:jk_logging.AbstractLogger):
+def waitForServiceStarted(fnGetPIDInfos:jk_mediawiki.impl.AbstractProcessFilter, name:str, log:jk_logging.AbstractLogger):
 	assert callable(fnGetPIDInfos)
 
 	countDown = 20
@@ -118,7 +122,7 @@ def waitForServiceStarted(fnGetPIDInfos, name:str, log:jk_logging.AbstractLogger
 #
 
 @jk_typing.checkFunctionSignature()
-def waitForServiceStopped(fnGetPIDInfos, name:str, log:jk_logging.AbstractLogger):
+def waitForServiceStopped(fnGetPIDInfos:jk_mediawiki.impl.AbstractProcessFilter, name:str, log:jk_logging.AbstractLogger):
 	assert callable(fnGetPIDInfos)
 
 	countDown = 40
@@ -139,10 +143,11 @@ def waitForServiceStopped(fnGetPIDInfos, name:str, log:jk_logging.AbstractLogger
 #
 # @param		dict cfg			The content of the user specific configuration file "~/.config/wikilocalctrl.json"
 #
-def cmd_httpstatus(cfg:dict, log, bVerbose:bool) -> list:
+@jk_typing.checkFunctionSignature()
+def cmd_httpstatus(ctx:jk_mediawiki.MWManagementCtx, cfg:dict, log, bVerbose:bool) -> list:
 	pids = []
 
-	h = instantiateLocalUserServiceMgr(cfg, userName, bVerbose)
+	h = instantiateLocalUserServiceMgr(ctx, cfg, bVerbose)
 
 	t = jk_console.SimpleTable()
 	t.addRow("Service", "Status", "Main Process(es)").hlineAfterRow = True
@@ -258,13 +263,11 @@ with jk_logging.wrapMain() as log:
 
 	# load configuration: merge it with specified arguments
 
-	userName = getpass.getuser()
-	homeDir = os.environ["HOME"]
-	cfgPath = os.path.join(homeDir, ".config/wikilocalctrl.json")
+	ctx = jk_mediawiki.MWManagementCtx()
 	if bVerbose:
-		log.notice("Loading: " + cfgPath)
-	if os.path.isfile(cfgPath):
-		cfg = jk_json.loadFromFile(cfgPath)
+		log.notice("Loading: " + ctx.cfgFilePath)
+	if os.path.isfile(ctx.cfgFilePath):
+		cfg = jk_json.loadFromFile(ctx.cfgFilePath)
 	else:
 		raise Exception("No configuration file: '~/.config/wikilocalctrl.json'")
 	if bVerbose:
@@ -276,7 +279,7 @@ with jk_logging.wrapMain() as log:
 		if not os.path.isdir(cfg[key]):
 			raise Exception(key + ": Directory does not exist: " + repr(cfg[key]))
 
-	localMediaWikisMgr = jk_mediawiki.LocalMediaWikisMgr(cfg["wwwWikiRootDir"], bVerbose)
+	localMediaWikisMgr = jk_mediawiki.LocalMediaWikisMgr(ctx, cfg["wwwWikiRootDir"], bVerbose)
 
 	# process the first command
 
@@ -308,7 +311,7 @@ with jk_logging.wrapMain() as log:
 	# ----------------------------------------------------------------
 
 	elif cmdName == "httpstop":
-		h = instantiateLocalUserServiceMgr(cfg, userName, bVerbose)
+		h = instantiateLocalUserServiceMgr(ctx, cfg, bVerbose)
 
 		nginxPIDs = h.getNGINXMasterProcesses(log)
 		if nginxPIDs:
@@ -327,28 +330,28 @@ with jk_logging.wrapMain() as log:
 	# ----------------------------------------------------------------
 
 	elif cmdName == "httpstart":
-		h = instantiateLocalUserServiceMgr(cfg, userName, bVerbose)
+		h = instantiateLocalUserServiceMgr(ctx, cfg, bVerbose)
 
 		nginxPIDs = h.getNGINXMasterProcesses(log)
 		if nginxPIDs:
 			log.notice("Local NGINX: Already running")
 		else:
 			h.startNGINX(log.descend("Local NGINX: Starting ..."))
-			waitForServiceStarted(h.getNGINXMasterProcesses, "NGINX", log)
+			waitForServiceStarted(h.getNGINXMasterProcessesProvider, "NGINX", log)
 
 		phpPIDs = h.getPHPFPMMasterProcesses(log)
 		if phpPIDs:
 			log.notice("Local PHP-FPM: Already running")
 		else:
 			h.startPHPFPM(log.descend("Local PHP-FPM: Starting ..."))
-			waitForServiceStarted(h.getPHPFPMMasterProcesses, "PHP-FPM", log)
+			waitForServiceStarted(h.getPHPFPMMasterProcessesProvider, "PHP-FPM", log)
 
 		sys.exit(0)
 
 	# ----------------------------------------------------------------
 
 	elif cmdName == "httprestart":
-		h = instantiateLocalUserServiceMgr(cfg, userName, bVerbose)
+		h = instantiateLocalUserServiceMgr(ctx, cfg, bVerbose)
 
 		nginxPIDs = h.getNGINXMasterProcesses(log)
 		if nginxPIDs:
@@ -363,16 +366,16 @@ with jk_logging.wrapMain() as log:
 			log.notice("Local PHP-FPM: Not running")
 
 		phpPIDs = h.getNGINXMasterProcesses(log)
-		waitForServiceStopped(h.getNGINXMasterProcesses, "NGINX", log)
+		waitForServiceStopped(h.getNGINXMasterProcessesProvider, "NGINX", log)
 
 		phpPIDs = h.getPHPFPMMasterProcesses(log)
-		waitForServiceStopped(h.getPHPFPMMasterProcesses, "PHP-FPM", log)
+		waitForServiceStopped(h.getPHPFPMMasterProcessesProvider, "PHP-FPM", log)
 
 		h.startNGINX(log.descend("Local NGINX: Starting ..."))
-		waitForServiceStarted(h.getNGINXMasterProcesses, "NGINX", log)
+		waitForServiceStarted(h.getNGINXMasterProcessesProvider, "NGINX", log)
 
 		h.startPHPFPM(log.descend("Local PHP-FPM: Starting ..."))
-		waitForServiceStarted(h.getPHPFPMMasterProcesses, "PHP-FPM", log)
+		waitForServiceStarted(h.getPHPFPMMasterProcessesProvider, "PHP-FPM", log)
 
 		sys.exit(0)
 
@@ -386,7 +389,7 @@ with jk_logging.wrapMain() as log:
 
 		# ----
 
-		r = localMediaWikisMgr.getStatusOverviewOne(wikiName, False, log)
+		r = localMediaWikisMgr.getStatusOverviewOne(wikiName, False, bVerbose, log)
 	
 		print()
 		r.table.print()
@@ -405,7 +408,7 @@ with jk_logging.wrapMain() as log:
 		# ----
 
 		_wikiInstDirPath = localMediaWikisMgr.getWikiInstDirPath(wikiName)
-		h = jk_mediawiki.MediaWikiLocalUserInstallationMgr(_wikiInstDirPath, userName, log)
+		h = jk_mediawiki.MediaWikiLocalUserInstallationMgr(ctx, _wikiInstDirPath, log)
 		bIsRunning = h.isCronScriptRunning()
 
 		pidInfos = h.getCronProcesses()
@@ -425,14 +428,14 @@ with jk_logging.wrapMain() as log:
 		# ----
 
 		_wikiInstDirPath = localMediaWikisMgr.getWikiInstDirPath(wikiName)
-		h = jk_mediawiki.MediaWikiLocalUserInstallationMgr(_wikiInstDirPath, userName, log)
+		h = jk_mediawiki.MediaWikiLocalUserInstallationMgr(ctx, _wikiInstDirPath, log)
 
 		pidInfos = h.getCronProcesses()
 		if pidInfos:
 			log.notice(wikiName + ": Already running")
 		else:
 			h.startCronScript(log.descend(wikiName + ": Starting ..."))
-			waitForServiceStarted(h.getCronProcesses, wikiName, log)
+			waitForServiceStarted(h.getCronProcessesProvider, wikiName, log)
 
 	# ----------------------------------------------------------------
 
@@ -442,7 +445,7 @@ with jk_logging.wrapMain() as log:
 		if wikiName not in wikiNames:
 			raise Exception("No such Wiki: \"" + wikiName + "\"")
 
-		h = instantiateLocalUserServiceMgr(cfg, userName, bVerbose)
+		h = instantiateLocalUserServiceMgr(ctx, cfg, bVerbose)
 
 		# ----
 
@@ -463,7 +466,7 @@ with jk_logging.wrapMain() as log:
 		# ----
 
 		_wikiInstDirPath = localMediaWikisMgr.getWikiInstDirPath(wikiName)
-		h = jk_mediawiki.MediaWikiLocalUserInstallationMgr(_wikiInstDirPath, userName, log)
+		h = jk_mediawiki.MediaWikiLocalUserInstallationMgr(ctx, _wikiInstDirPath, log)
 
 		pidInfos = h.getCronProcesses()
 		if pidInfos:
@@ -480,12 +483,12 @@ with jk_logging.wrapMain() as log:
 		if wikiName not in wikiNames:
 			raise Exception("No such Wiki: \"" + wikiName + "\"")
 
-		h = instantiateLocalUserServiceMgr(cfg, userName, bVerbose)
+		h = instantiateLocalUserServiceMgr(ctx, cfg, bVerbose)
 
 		# ----
 
 		_wikiInstDirPath = localMediaWikisMgr.getWikiInstDirPath(wikiName)
-		h = jk_mediawiki.MediaWikiLocalUserInstallationMgr(_wikiInstDirPath, userName, log)
+		h = jk_mediawiki.MediaWikiLocalUserInstallationMgr(ctx, _wikiInstDirPath, log)
 
 		pidInfos = h.getCronProcesses()
 		if pidInfos:
@@ -499,7 +502,7 @@ with jk_logging.wrapMain() as log:
 		for wikiToCheck in wikiNames:
 			if wikiToCheck != wikiName:
 				_wikiInstDirPath = localMediaWikisMgr.getWikiInstDirPath(wikiName)
-				h = jk_mediawiki.MediaWikiLocalUserInstallationMgr(_wikiInstDirPath, userName, log)
+				h = jk_mediawiki.MediaWikiLocalUserInstallationMgr(ctx, _wikiInstDirPath, log)
 				pidInfos = h.getCronProcesses()
 				if pidInfos:
 					allRunningWikis.append(wikiToCheck)
@@ -509,7 +512,7 @@ with jk_logging.wrapMain() as log:
 
 			log.notice("No more Wikis are running => NGINX and PHP no longer needed")
 
-			h = instantiateLocalUserServiceMgr(cfg, userName, bVerbose)
+			h = instantiateLocalUserServiceMgr(ctx, cfg, bVerbose)
 
 			nginxPIDs = h.getNGINXMasterProcesses(log)
 			if nginxPIDs:
@@ -526,10 +529,10 @@ with jk_logging.wrapMain() as log:
 	# ----------------------------------------------------------------
 
 	elif cmdName == "status":
-		pids1 = cmd_httpstatus(cfg, log, bVerbose)
+		pids1 = cmd_httpstatus(ctx, cfg, log, bVerbose)
 		assert isinstance(pids1, list)
 
-		r = localMediaWikisMgr.getStatusOverviewAll(False, log)
+		r = localMediaWikisMgr.getStatusOverviewAll(False, bVerbose, log)
 	
 		print()
 		r.table.print()
@@ -547,9 +550,9 @@ with jk_logging.wrapMain() as log:
 	# ----------------------------------------------------------------
 
 	elif cmdName == "statusfull":
-		cmd_httpstatus(cfg, log, bVerbose)
+		cmd_httpstatus(ctx, cfg, log, bVerbose)
 
-		r = localMediaWikisMgr.getStatusOverviewAll(True, log)
+		r = localMediaWikisMgr.getStatusOverviewAll(True, bVerbose, log)
 
 		print()
 		r.table.print()

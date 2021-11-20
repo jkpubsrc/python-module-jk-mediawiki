@@ -2,9 +2,9 @@
 
 import os
 import typing
+import time
 
 import jk_typing
-import jk_cachefunccalls
 
 from .AbstractProcessFilter import AbstractProcessFilter
 
@@ -23,8 +23,13 @@ class ProcessProviderCache(AbstractProcessFilter):
 	# Constructor method.
 	#
 	@jk_typing.checkFunctionSignature()
-	def __init__(self, source:AbstractProcessFilter):
+	def __init__(self, source:AbstractProcessFilter, cachingSeconds:int = 2):
+		assert cachingSeconds > 0
+
 		self.__source = source
+		self.__cachingSeconds = cachingSeconds
+		self.__lastT = 0
+		self.__lastData = None
 	#
 
 	################################################################################################################################
@@ -39,9 +44,20 @@ class ProcessProviderCache(AbstractProcessFilter):
 	## Public Methods
 	################################################################################################################################
 
-	@jk_cachefunccalls.cacheCalls(seconds=3)
 	def listProcesses(self) -> typing.List[dict]:
-		return self.__source.listProcesses()
+		tNow = time.time()
+		tAge = tNow - self.__lastT
+
+		if (tAge > 1) or (self.__lastData is None):
+			self.__lastData = self.__source.listProcesses()
+			self.__lastT = tNow
+
+		return self.__lastData
+	#
+
+	def invalidate(self):
+		self.__lastData = None
+		self.__source.invalidate()
 	#
 
 #

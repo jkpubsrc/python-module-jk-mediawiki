@@ -12,6 +12,7 @@ import jk_logging
 
 from .impl.LocalWikiInstInfo import LocalWikiInstInfo
 from .impl.LocalWikiScanner import LocalWikiScanner
+from .MWManagementCtx import MWManagementCtx
 
 
 
@@ -58,7 +59,7 @@ class LocalMediaWikisMgr(object):
 	# @param		str wwwWikiRootDir			The directory where all local MediaWiki installations reside.
 	#
 	@jk_typing.checkFunctionSignature()
-	def __init__(self, wwwWikiRootDir:str, bVerbose:bool):
+	def __init__(self, ctx:MWManagementCtx, wwwWikiRootDir:str, bVerbose:bool):
 		if not os.path.isdir(wwwWikiRootDir):
 			raise Exception("No such directory: \"{}\"".format(wwwWikiRootDir))
 		self.__wwwWikiRootDir = os.path.abspath(wwwWikiRootDir)
@@ -68,6 +69,8 @@ class LocalMediaWikisMgr(object):
 		self.__bVerbose = bVerbose
 
 		self.__wikiScanner = LocalWikiScanner(self.__wwwWikiRootDir)
+
+		self.__ctx = ctx
 	#
 
 	################################################################################################################################
@@ -90,7 +93,7 @@ class LocalMediaWikisMgr(object):
 	# Collects a list of mediawikis installed
 	#
 	@jk_typing.checkFunctionSignature()
-	def _getStatusOverview(self, wikiName:typing.Union[str,None], bWithDiskSpace:bool, log:jk_logging.AbstractLogger) -> _StatusOverviewResult:
+	def _getStatusOverview(self, wikiName:typing.Union[str,None], bWithDiskSpace:bool, bVerbose:bool, log:jk_logging.AbstractLogger) -> _StatusOverviewResult:
 		wikiInsts = self.__wikiScanner.wikis
 
 		pids = []
@@ -108,8 +111,9 @@ class LocalMediaWikisMgr(object):
 				if wikiInst.name != wikiName:
 					continue
 
-			with log.descend("Checking wiki: " + wikiInst.name) as log2:
-				h = jk_mediawiki.MediaWikiLocalUserInstallationMgr(wikiInst.instDirPath, self.__userName, log2)
+			blog = jk_logging.BufferLogger2.create()
+			with blog.descend("Checking wiki: " + wikiInst.name) as log2:
+				h = jk_mediawiki.MediaWikiLocalUserInstallationMgr(self.__ctx, wikiInst.instDirPath, log2)
 				bIsRunning = h.isCronScriptRunning()
 				c = jk_console.Console.ForeGround.STD_GREEN if bIsRunning else jk_console.Console.ForeGround.STD_DARKGRAY
 				smVersion = h.getSMWVersion()
@@ -136,6 +140,9 @@ class LocalMediaWikisMgr(object):
 					rowData.append(_formatMBytes(diskUsage.rw / 1048576))
 				t.addRow(*rowData).color = c
 
+			if blog.stats.hasAtLeastWarning or bVerbose:
+				blog.forwardTo(log)
+
 		return _StatusOverviewResult(t, pids)
 	#
 
@@ -160,16 +167,16 @@ class LocalMediaWikisMgr(object):
 	# Collects a list of mediawikis installed
 	#
 	@jk_typing.checkFunctionSignature()
-	def getStatusOverviewAll(self, bWithDiskSpace:bool, log:jk_logging.AbstractLogger) -> _StatusOverviewResult:
-		return self._getStatusOverview(None, bWithDiskSpace, log)
+	def getStatusOverviewAll(self, bWithDiskSpace:bool, bVerbose:bool, log:jk_logging.AbstractLogger) -> _StatusOverviewResult:
+		return self._getStatusOverview(None, bWithDiskSpace, bVerbose, log)
 	#
 
 	#
 	# Collects a list of mediawikis installed
 	#
 	@jk_typing.checkFunctionSignature()
-	def getStatusOverviewOne(self, wikiName:str, bWithDiskSpace:bool, log:jk_logging.AbstractLogger) -> _StatusOverviewResult:
-		return self._getStatusOverview(wikiName, bWithDiskSpace, log)
+	def getStatusOverviewOne(self, wikiName:str, bWithDiskSpace:bool, bVerbose:bool, log:jk_logging.AbstractLogger) -> _StatusOverviewResult:
+		return self._getStatusOverview(wikiName, bWithDiskSpace, bVerbose, log)
 	#
 
 	#

@@ -10,6 +10,12 @@ import jk_sysinfo
 import jk_logging
 import jk_typing
 
+from .impl.AbstractProcessFilter import AbstractProcessFilter
+from .impl.WikiNGINXProcessFilter import WikiNGINXProcessFilter
+from .impl.WikiPHPProcessFilter import WikiPHPProcessFilter
+from .MWManagementCtx import MWManagementCtx
+
+
 
 
 
@@ -35,28 +41,23 @@ class MediaWikiLocalUserServiceMgr(object):
 	#
 	# Configuration parameters:
 	#
+	# @param	MWManagementCtx ctx			A management context that provides common data.
 	# @param	str startNGINXScript		The absolute file path of a script that starts an user space NGINX in the background.
 	#										If not specified no shutdown and restart can be performed.
 	# @param	str startPHPFPMScript		The absolute file path of a script that starts an user space PHP process in the background.
 	#										If not specified no shutdown and restart can be performed.
 	# @param	str localEtcDirPath			The path of the local 'etc' directory used by the NGINX and PHP process
-	# @param	str userName				The name of the user account under which NGINX, PHP and the Wiki cron process are executed.
 	#
 	@jk_typing.checkFunctionSignature()
 	def __init__(self,
+		ctx:MWManagementCtx,
 		startNGINXScript:str,
 		startPHPFPMScript:str,
 		localEtcDirPath:str,
-		userName:str,
 		bVerbose:bool = False,
 		):
 
-		# store and process the account name the system processes are running under
-
-		assert isinstance(userName, str)
-		assert userName
-
-		self.__userName = userName
+		self.__ctx = ctx
 
 		# other scripts
 
@@ -77,6 +78,15 @@ class MediaWikiLocalUserServiceMgr(object):
 		self.__startPHPFPMScriptDirPath = os.path.dirname(startPHPFPMScript) if startPHPFPMScript else None
 		self.__localEtcDirPath = localEtcDirPath
 		self.__bVerbose = bVerbose
+
+		self.__phpProcessProvider = WikiPHPProcessFilter(
+			userName=self.__ctx.currentUserName,
+			source=self.__ctx.osProcessProvider
+		)
+		self.__nginxProcessProvider = WikiNGINXProcessFilter(
+			userName=self.__ctx.currentUserName,
+			source=self.__ctx.osProcessProvider
+		)
 	#
 
 	################################################################################################################################
@@ -116,12 +126,18 @@ class MediaWikiLocalUserServiceMgr(object):
 	## Public Methods
 	################################################################################################################################
 
-	def isPHPFPMRunning(self, debugLog:jk_logging.AbstractLogger = None):
-		return self.getPHPFPMMasterProcesses(debugLog) is not None
+	def isPHPFPMRunning(self, debugLog:jk_logging.AbstractLogger = None) -> bool:
+		provider = self.getPHPFPMMasterProcessesProvider(debugLog)
+		if provider is None:
+			return False
+		return bool(provider())
 	#
 
-	def isNGINXRunning(self, debugLog:jk_logging.AbstractLogger = None):
-		return self.getNGINXMasterProcesses(debugLog) is not None
+	def isNGINXRunning(self, debugLog:jk_logging.AbstractLogger = None) -> bool:
+		provider = self.getNGINXMasterProcessesProvider(debugLog)() is not None
+		if provider is None:
+			return False
+		return bool(provider())
 	#
 
 	#
@@ -131,9 +147,11 @@ class MediaWikiLocalUserServiceMgr(object):
 	# NOTE: Debug information is written to the log if verbose output is enabled.
 	#
 	def stopPHPFPM(self, log:jk_logging.AbstractLogger):
-		processes = self.getPHPFPMMasterProcesses(log if self.__bVerbose else None)
+		provider = self.getPHPFPMMasterProcessesProvider(log if self.__bVerbose else None)
+		processes = provider()
 		if processes:
 			log.info("Now stopping PHP-FPM processes: " + str([ x["pid"] for x in processes ]))
+			provider.invalidate()
 			if not jk_utils.processes.killProcesses(processes, log):
 				raise Exception("There were errors stopping PHP-FPM!")
 		else:
@@ -147,9 +165,11 @@ class MediaWikiLocalUserServiceMgr(object):
 	# NOTE: Debug information is written to the log if verbose output is enabled.
 	#
 	def stopNGINX(self, log:jk_logging.AbstractLogger):
-		processes = self.getNGINXMasterProcesses(log if self.__bVerbose else None)
+		provider = self.getNGINXMasterProcessesProvider(log if self.__bVerbose else None)
+		processes = provider()
 		if processes:
 			log.info("Now stopping NGINX processes: " + str([ x["pid"] for x in processes ]))
+			provider.invalidate()
 			if not jk_utils.processes.killProcesses(processes, log):
 				raise Exception("There were errors stopping NGINX!")
 		else:
@@ -163,10 +183,12 @@ class MediaWikiLocalUserServiceMgr(object):
 	# NOTE: Debug information is written to the log if verbose output is enabled.
 	#
 	def startPHPFPM(self, log:jk_logging.AbstractLogger):
-		if self.getPHPFPMMasterProcesses(log if self.__bVerbose else None) is not None:
+		provider = self.getPHPFPMMasterProcessesProvider(log if self.__bVerbose else None)
+		if provider is not None:
 			raise Exception("PHP-FPM process already running!")
+		provider.invalidate()
 		if not jk_utils.processes.runProcessAsOtherUser(
-				accountName=self.__userName,
+				accountName=self.__ctx.currentUserName,
 				filePath=self.__startPHPFPMScriptFilePath,
 				args=None,
 				log=log if self.__bVerbose else None
@@ -182,10 +204,12 @@ class MediaWikiLocalUserServiceMgr(object):
 	# NOTE: Debug information is written to the log if verbose output is enabled.
 	#
 	def startNGINX(self, log:jk_logging.AbstractLogger):
-		if self.getNGINXMasterProcesses(log if self.__bVerbose else None) is not None:
+		provider = self.getNGINXMasterProcessesProvider(log if self.__bVerbose else None)
+		if provider is not None:
 			raise Exception("NGINX process already running!")
+		provider.invalidate()
 		if not jk_utils.processes.runProcessAsOtherUser(
-				accountName=self.__userName,
+				accountName=self.__ctx.currentUserName,
 				filePath=self.__startNGINXScriptFilePath,
 				args=None,
 				log=log if self.__bVerbose else None
@@ -197,81 +221,35 @@ class MediaWikiLocalUserServiceMgr(object):
 	#
 	# Returns the master process(es) of "php-fpm". This should be only one process.
 	#
-	def getPHPFPMMasterProcesses(self, debugLog:jk_logging.AbstractLogger = None) -> typing.Union[list, None]:
+	@jk_typing.checkFunctionSignature()
+	def getPHPFPMMasterProcessesProvider(self, debugLog:jk_logging.AbstractLogger = None) -> typing.Union[AbstractProcessFilter,None]:
 		if self.__startPHPFPMScriptDirPath is None:
 			return None
 
-		processList = jk_sysinfo.get_ps()
-
-		if debugLog and self.__bVerbose:
-			debugLog = debugLog.descend("Scanning for processes ...")
-		else:
-			# NOTE: if no debugging is enabled, no debug logger will be used.
-			debugLog = None
-
-		ret = []
-		for x in processList:
-			if x["user"] != self.__userName:
-				if debugLog:
-					debugLog.debug("Rejecting because not owned by user '{}': {}".format(self.__userName, x))
-				continue
-			if x["cmd"].find("php-fpm") < 0:
-				if debugLog:
-					debugLog.debug("Rejecting because command does not contain 'php-fpm': {}".format(x))
-				continue
-			if not x["args"].startswith("master process"):
-				if debugLog:
-					debugLog.debug("Rejecting because 'args' does not start with 'master process': {}".format(self.__startPHPFPMScriptDirPath, x))
-				continue
-			if x["args"].find("(" + self.__localEtcDirPath) < 0:
-				if debugLog:
-					debugLog.debug("Rejecting because does not seem to refer to the local configuration directory: {}".format(x))
-				continue
-			if debugLog:
-				debugLog.debug("Accepting: {}".format(x))
-			ret.append(x)
-
-		return ret if ret else None
+		return self.__phpProcessProvider
 	#
 
 	#
 	# Returns the master process(es) of "nginx". This should be only one process.
 	#
-	def getNGINXMasterProcesses(self, debugLog:jk_logging.AbstractLogger = None) -> typing.Union[list, None]:
+	@jk_typing.checkFunctionSignature()
+	def getNGINXMasterProcessesProvider(self, debugLog:jk_logging.AbstractLogger = None) -> typing.Union[AbstractProcessFilter,None]:
 		if self.__startNGINXScriptDirPath is None:
 			return None
 
-		processList = jk_sysinfo.get_ps()
+		return self.__nginxProcessProvider
+	#
 
-		if debugLog and self.__bVerbose:
-			debugLog = debugLog.descend("Scanning for processes ...")
-		else:
-			# NOTE: if no debugging is enabled, no debug logger will be used.
-			debugLog = None
+	@jk_typing.checkFunctionSignature()
+	def getPHPFPMMasterProcesses(self, debugLog:jk_logging.AbstractLogger = None) -> typing.Union[typing.List[dict],None]:
+		pidsProvider = self.getPHPFPMMasterProcessesProvider(debugLog)
+		return pidsProvider() if pidsProvider else None
+	#
 
-		ret = []
-		for x in processList:
-			if x["user"] != self.__userName:
-				if debugLog:
-					debugLog.debug("Rejecting because not owned by user '{}': {}".format(self.__userName, x))
-				continue
-			if not x["cmd"].startswith("nginx"):
-				if debugLog:
-					debugLog.debug("Rejecting because command does not start with 'nginx': {}".format(x))
-				continue
-			if not x["args"].startswith("master process"):
-				if debugLog:
-					debugLog.debug("Rejecting because 'args' does not start with 'master process': {}".format(self.__startPHPFPMScriptDirPath, x))
-				continue
-			if x["args"].find("-c " + self.__localEtcDirPath) < 0:
-				if debugLog:
-					debugLog.debug("Rejecting because does not seem to refer to the local configuration directory: {}".format(x))
-				continue
-			if debugLog:
-				debugLog.debug("Accepting: {}".format(x))
-			ret.append(x)
-
-		return ret if ret else None
+	@jk_typing.checkFunctionSignature()
+	def getNGINXMasterProcesses(self, debugLog:jk_logging.AbstractLogger = None) -> typing.Union[typing.List[dict],None]:
+		pidsProvider = self.getNGINXMasterProcessesProvider(debugLog)
+		return pidsProvider() if pidsProvider else None
 	#
 
 	################################################################################################################################

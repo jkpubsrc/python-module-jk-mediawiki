@@ -178,6 +178,10 @@ class ProcessFilter(AbstractProcessFilter):
 		return ret
 	#
 
+	def invalidate(self):
+		self.__source.invalidate()
+	#
+
 #
 
 

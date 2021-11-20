@@ -9,7 +9,6 @@ import jk_logging
 import jk_json
 import jk_prettyprintobj
 import jk_sysinfo
-import jk_cachefunccalls
 
 
 
@@ -42,6 +41,10 @@ class AbstractProcessFilter(object):
 
 	def __call__(self):
 		return self.listProcesses()
+	#
+
+	def invalidate(self):
+		raise NotImplementedError()
 	#
 
 #

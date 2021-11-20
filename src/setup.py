@@ -36,7 +36,6 @@ setup(
 		"jk_sysinfo",
 		"jk_mounting",
 		"jk_prettyprintobj",
-		"jk_cachefunccalls",
 	],
 	keywords = [
 		"mediawiki",
@@ -53,7 +52,7 @@ setup(
 	scripts = [
 		"bin/wikilocalctrl.py",
 	],
-	version = "0.2021.11.15",
+	version = "0.2021.11.20",
 	zip_safe = False,
 	long_description = readme(),
 	long_description_content_type="text/markdown",
