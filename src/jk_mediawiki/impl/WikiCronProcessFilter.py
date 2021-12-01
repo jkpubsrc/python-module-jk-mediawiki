@@ -61,10 +61,6 @@ class WikiCronProcessFilter(ProcessFilter):
 	## Public Methods
 	################################################################################################################################
 
-	def invalidate(self):
-		self.__source.invalidate()
-	#
-
 #
 
 

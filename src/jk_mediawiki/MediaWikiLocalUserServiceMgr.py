@@ -184,7 +184,8 @@ class MediaWikiLocalUserServiceMgr(object):
 	#
 	def startPHPFPM(self, log:jk_logging.AbstractLogger):
 		provider = self.getPHPFPMMasterProcessesProvider(log if self.__bVerbose else None)
-		if provider is not None:
+		processes = provider()
+		if processes:
 			raise Exception("PHP-FPM process already running!")
 		provider.invalidate()
 		if not jk_utils.processes.runProcessAsOtherUser(
@@ -205,7 +206,8 @@ class MediaWikiLocalUserServiceMgr(object):
 	#
 	def startNGINX(self, log:jk_logging.AbstractLogger):
 		provider = self.getNGINXMasterProcessesProvider(log if self.__bVerbose else None)
-		if provider is not None:
+		processes = provider()
+		if processes:
 			raise Exception("NGINX process already running!")
 		provider.invalidate()
 		if not jk_utils.processes.runProcessAsOtherUser(

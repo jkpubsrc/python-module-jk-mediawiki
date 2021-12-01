@@ -304,10 +304,11 @@ class MediaWikiLocalUserInstallationMgr(object):
 	#
 
 	def stopCronScript(self, log = None):
-		processes = self.getCronProcesses()
+		processProvider = self.getCronProcessesProvider()
+		processes = processProvider()
 		if processes:
 			log.info("Now stopping cron background processes: " + str([ x["pid"] for x in processes ]))
-			self.__osProcessProvider.invalidate()
+			processProvider.invalidate()
 			if not jk_utils.processes.killProcesses(processes, log):
 				raise Exception("There were errors stopping the cron background script!")
 		else:
@@ -315,9 +316,11 @@ class MediaWikiLocalUserInstallationMgr(object):
 	#
 
 	def startCronScript(self, log = None):
-		if self.getCronProcesses() is not None:
+		processProvider = self.getCronProcessesProvider()
+		processes = processProvider()
+		if processes:
 			raise Exception("Cron process already running!")
-		self.__osProcessProvider.invalidate()
+		processProvider.invalidate()
 		if not jk_utils.processes.runProcessAsOtherUser(
 				accountName=self.__ctx.currentUserName,
 				filePath=self.__startCronScriptFilePath,

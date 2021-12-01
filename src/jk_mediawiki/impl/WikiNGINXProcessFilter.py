@@ -75,7 +75,8 @@ class WikiNGINXProcessFilter(AbstractProcessFilter):
 	#
 
 	def invalidate(self):
-		self.__source.invalidate()
+		self.__filter1.invalidate()
+		self.__filter2.invalidate()
 	#
 
 #

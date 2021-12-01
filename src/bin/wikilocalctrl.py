@@ -337,14 +337,14 @@ with jk_logging.wrapMain() as log:
 			log.notice("Local NGINX: Already running")
 		else:
 			h.startNGINX(log.descend("Local NGINX: Starting ..."))
-			waitForServiceStarted(h.getNGINXMasterProcessesProvider, "NGINX", log)
+			waitForServiceStarted(h.getNGINXMasterProcessesProvider(), "NGINX", log)
 
 		phpPIDs = h.getPHPFPMMasterProcesses(log)
 		if phpPIDs:
 			log.notice("Local PHP-FPM: Already running")
 		else:
 			h.startPHPFPM(log.descend("Local PHP-FPM: Starting ..."))
-			waitForServiceStarted(h.getPHPFPMMasterProcessesProvider, "PHP-FPM", log)
+			waitForServiceStarted(h.getPHPFPMMasterProcessesProvider(), "PHP-FPM", log)
 
 		sys.exit(0)
 
@@ -366,16 +366,16 @@ with jk_logging.wrapMain() as log:
 			log.notice("Local PHP-FPM: Not running")
 
 		phpPIDs = h.getNGINXMasterProcesses(log)
-		waitForServiceStopped(h.getNGINXMasterProcessesProvider, "NGINX", log)
+		waitForServiceStopped(h.getNGINXMasterProcessesProvider(), "NGINX", log)
 
 		phpPIDs = h.getPHPFPMMasterProcesses(log)
-		waitForServiceStopped(h.getPHPFPMMasterProcessesProvider, "PHP-FPM", log)
+		waitForServiceStopped(h.getPHPFPMMasterProcessesProvider(), "PHP-FPM", log)
 
 		h.startNGINX(log.descend("Local NGINX: Starting ..."))
-		waitForServiceStarted(h.getNGINXMasterProcessesProvider, "NGINX", log)
+		waitForServiceStarted(h.getNGINXMasterProcessesProvider(), "NGINX", log)
 
 		h.startPHPFPM(log.descend("Local PHP-FPM: Starting ..."))
-		waitForServiceStarted(h.getPHPFPMMasterProcessesProvider, "PHP-FPM", log)
+		waitForServiceStarted(h.getPHPFPMMasterProcessesProvider(), "PHP-FPM", log)
 
 		sys.exit(0)
 
@@ -435,7 +435,7 @@ with jk_logging.wrapMain() as log:
 			log.notice(wikiName + ": Already running")
 		else:
 			h.startCronScript(log.descend(wikiName + ": Starting ..."))
-			waitForServiceStarted(h.getCronProcessesProvider, wikiName, log)
+			waitForServiceStarted(h.getCronProcessesProvider(), wikiName, log)
 
 	# ----------------------------------------------------------------
 
@@ -454,14 +454,14 @@ with jk_logging.wrapMain() as log:
 			log.notice("Local NGINX: Already running")
 		else:
 			h.startNGINX(log.descend("Local NGINX: Starting ..."))
-			waitForServiceStarted(h.getNGINXMasterProcesses, "NGINX", log)
+			waitForServiceStarted(h.getNGINXMasterProcessesProvider(), "NGINX", log)
 
 		phpPIDs = h.getPHPFPMMasterProcesses(log)
 		if phpPIDs:
 			log.notice("Local PHP-FPM: Already running")
 		else:
 			h.startPHPFPM(log.descend("Local PHP-FPM: Starting ..."))
-			waitForServiceStarted(h.getPHPFPMMasterProcesses, "PHP-FPM", log)
+			waitForServiceStarted(h.getPHPFPMMasterProcessesProvider(), "PHP-FPM", log)
 
 		# ----
 
@@ -473,7 +473,7 @@ with jk_logging.wrapMain() as log:
 			log.notice(wikiName + ": Already running")
 		else:
 			h.startCronScript(log.descend(wikiName + ": Starting ..."))
-			waitForServiceStarted(h.getCronProcesses, wikiName, log)
+			waitForServiceStarted(h.getCronProcessesProvider(), wikiName, log)
 
 	# ----------------------------------------------------------------
 
