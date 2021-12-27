@@ -1,7 +1,7 @@
 ﻿
 
 
-__version__ = "0.2021.12.1"
+__version__ = "0.2021.12.27"
 
 
 
@@ -9,5 +9,4 @@ from .MediaWikiLocalSettingsArrayAppend import MediaWikiLocalSettingsArrayAppend
 from .MediaWikiLocalSettingsComplexVariableAssignment import MediaWikiLocalSettingsComplexVariableAssignment
 from .MediaWikiLocalSettingsVariableAssignment import MediaWikiLocalSettingsVariableAssignment
 from .MediaWikiLocalSettingsFile import MediaWikiLocalSettingsFile
-
 
