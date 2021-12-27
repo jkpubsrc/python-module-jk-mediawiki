@@ -15,4 +15,5 @@
 
 * 2021-12-27
 	* bugfix: corrected call to cmd_httpstatus()
+	* adapted to match new release of jk_logging
 

@@ -111,7 +111,7 @@ class LocalMediaWikisMgr(object):
 				if wikiInst.name != wikiName:
 					continue
 
-			blog = jk_logging.BufferLogger2.create()
+			blog = jk_logging.BufferLogger.create()
 			with blog.descend("Checking wiki: " + wikiInst.name) as log2:
 				h = jk_mediawiki.MediaWikiLocalUserInstallationMgr(self.__ctx, wikiInst.instDirPath, log2)
 				bIsRunning = h.isCronScriptRunning()
