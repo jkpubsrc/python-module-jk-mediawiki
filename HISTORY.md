@@ -13,3 +13,6 @@
 * 2021-12-01
 	* improved: identification of processes
 
+* 2021-12-27
+	* bugfix: corrected call to cmd_httpstatus()
+

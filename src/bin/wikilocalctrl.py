@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/python3.8
 
 import time
 import datetime
@@ -304,7 +304,7 @@ with jk_logging.wrapMain() as log:
 	# ----------------------------------------------------------------
 
 	elif cmdName == "httpstatus":
-		cmd_httpstatus(cfg, log, bVerbose)
+		cmd_httpstatus(ctx, cfg, log, bVerbose)
 		print()
 		sys.exit(0)
 
