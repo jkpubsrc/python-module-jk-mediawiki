@@ -1,7 +1,7 @@
 ﻿
 
 
-__version__ = "0.2022.1.12"
+__version__ = "0.2022.1.12.1"
 
 
 
@@ -17,4 +17,3 @@ from .ProcessFilter import ProcessFilter
 from .WikiCronProcessFilter import WikiCronProcessFilter
 from .WikiPHPProcessFilter import WikiPHPProcessFilter
 from .WikiNGINXProcessFilter import WikiNGINXProcessFilter
-

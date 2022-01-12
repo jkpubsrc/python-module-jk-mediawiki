@@ -73,6 +73,7 @@ ap.createCommand("statusfull", "List full status of HTTP service(s) and local Wi
 ap.createCommand("start", "Start relevant service(s) to run a specific wiki.").expectString("wikiName", minLength=1)
 ap.createCommand("stop", "Stop relevant service(s) to terminate a specific wiki.").expectString("wikiName", minLength=1)
 ap.createCommand("extensionmatrix", "Display a matrix about all wiki extensions.")
+ap.createCommand("list", "Display a list of installed wikis.")
 
 
 
@@ -306,7 +307,7 @@ with jk_logging.wrapMain() as log:
 	elif cmdName == "httpstatus":
 		cmd_httpstatus(ctx, cfg, log, bVerbose)
 		print()
-		sys.exit(0)
+		#sys.exit(0)
 
 	# ----------------------------------------------------------------
 
@@ -325,7 +326,7 @@ with jk_logging.wrapMain() as log:
 		else:
 			log.notice("Local PHP-FPM: Already stopped")
 
-		sys.exit(0)
+		#sys.exit(0)
 
 	# ----------------------------------------------------------------
 
@@ -346,7 +347,7 @@ with jk_logging.wrapMain() as log:
 			h.startPHPFPM(log.descend("Local PHP-FPM: Starting ..."))
 			waitForServiceStarted(h.getPHPFPMMasterProcessesProvider(), "PHP-FPM", log)
 
-		sys.exit(0)
+		#sys.exit(0)
 
 	# ----------------------------------------------------------------
 
@@ -377,7 +378,7 @@ with jk_logging.wrapMain() as log:
 		h.startPHPFPM(log.descend("Local PHP-FPM: Starting ..."))
 		waitForServiceStarted(h.getPHPFPMMasterProcessesProvider(), "PHP-FPM", log)
 
-		sys.exit(0)
+		#sys.exit(0)
 
 	# ----------------------------------------------------------------
 
@@ -395,7 +396,18 @@ with jk_logging.wrapMain() as log:
 		r.table.print()
 		print()
 
-		sys.exit(0)
+		#sys.exit(0)
+
+	# ----------------------------------------------------------------
+
+	elif cmdName == "list":
+		r = localMediaWikisMgr.getStatusOverviewAll(False, bVerbose, log)
+	
+		print()
+		r.table.print()
+		print()
+
+		#sys.exit(0)
 
 	# ----------------------------------------------------------------
 
@@ -545,7 +557,7 @@ with jk_logging.wrapMain() as log:
 
 		cmd_diskfree(cfg, log)
 		print()
-		sys.exit(0)
+		#sys.exit(0)
 
 	# ----------------------------------------------------------------
 
@@ -560,14 +572,14 @@ with jk_logging.wrapMain() as log:
 
 		cmd_diskfree(cfg, log)
 		print()
-		sys.exit(0)
+		#sys.exit(0)
 
 	# ----------------------------------------------------------------
 
 	elif cmdName == "df":
 		cmd_diskfree(cfg, log)
 		print()
-		sys.exit(0)
+		#sys.exit(0)
 
 	# ----------------------------------------------------------------
 
@@ -578,7 +590,7 @@ with jk_logging.wrapMain() as log:
 		table.print()
 		print()
 
-		sys.exit(0)
+		#sys.exit(0)
 
 	# ----------------------------------------------------------------
 

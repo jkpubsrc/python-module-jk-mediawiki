@@ -19,7 +19,7 @@
 
 * 2022-01-12
 	* bugfix: corrected reference to moved class
-
+	* improved: now supporting a simplified directory layout
 
 
 

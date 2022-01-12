@@ -90,7 +90,7 @@ class LocalMediaWikisMgr(object):
 	################################################################################################################################
 
 	#
-	# Collects a list of mediawikis installed
+	# Collects a list of installed mediawikis
 	#
 	@jk_typing.checkFunctionSignature()
 	def _getStatusOverview(self, wikiName:typing.Union[str,None], bWithDiskSpace:bool, bVerbose:bool, log:jk_logging.AbstractLogger) -> _StatusOverviewResult:
@@ -112,33 +112,36 @@ class LocalMediaWikisMgr(object):
 					continue
 
 			blog = jk_logging.BufferLogger.create()
-			with blog.descend("Checking wiki: " + wikiInst.name) as log2:
-				h = jk_mediawiki.MediaWikiLocalUserInstallationMgr(self.__ctx, wikiInst.instDirPath, log2)
-				bIsRunning = h.isCronScriptRunning()
-				c = jk_console.Console.ForeGround.STD_GREEN if bIsRunning else jk_console.Console.ForeGround.STD_DARKGRAY
-				smVersion = h.getSMWVersion()
-				lastCfgTime = h.getLastConfigurationTimeStamp()
-				lastUseTime = h.getLastUseTimeStamp()
-				processInfos = h.getCronProcesses()
-				if processInfos:
-					processPIDs = [ x["pid"] for x in processInfos ]
-					pids.extend(processPIDs)
-				rowData = [
-					wikiInst.name,
-					str(h.getVersion()),
-					str(smVersion) if smVersion else "-",
-					"running" if bIsRunning else "stopped",
-					lastCfgTime.strftime("%Y-%m-%d %H:%M") if lastCfgTime else "-",
-					lastUseTime.strftime("%Y-%m-%d %H:%M") if lastUseTime else "-",
-					str(processPIDs) if bIsRunning else "-",
-				]
-				if pids:
-					pids.extend(pids)
-				if bWithDiskSpace:
-					diskUsage = h.getDiskUsage()
-					rowData.append(_formatMBytes(diskUsage.ro / 1048576))
-					rowData.append(_formatMBytes(diskUsage.rw / 1048576))
-				t.addRow(*rowData).color = c
+			try:
+				with blog.descend("Checking wiki: " + wikiInst.name) as log2:
+					h = jk_mediawiki.MediaWikiLocalUserInstallationMgr(self.__ctx, wikiInst, log2)
+					bIsRunning = h.isCronScriptRunning()
+					c = jk_console.Console.ForeGround.STD_GREEN if bIsRunning else jk_console.Console.ForeGround.STD_DARKGRAY
+					smVersion = h.getSMWVersion()
+					lastCfgTime = h.getLastConfigurationTimeStamp()
+					lastUseTime = h.getLastUseTimeStamp()
+					processInfos = h.getCronProcesses()
+					if processInfos:
+						processPIDs = [ x["pid"] for x in processInfos ]
+						pids.extend(processPIDs)
+					rowData = [
+						wikiInst.name,
+						str(h.getVersion()),
+						str(smVersion) if smVersion else "-",
+						"running" if bIsRunning else "stopped",
+						lastCfgTime.strftime("%Y-%m-%d %H:%M") if lastCfgTime else "-",
+						lastUseTime.strftime("%Y-%m-%d %H:%M") if lastUseTime else "-",
+						str(processPIDs) if bIsRunning else "-",
+					]
+					if pids:
+						pids.extend(pids)
+					if bWithDiskSpace:
+						diskUsage = h.getDiskUsage()
+						rowData.append(_formatMBytes(diskUsage.ro / 1048576))
+						rowData.append(_formatMBytes(diskUsage.rw / 1048576))
+					t.addRow(*rowData).color = c
+			except jk_logging.ExceptionInChildContextException as ee:
+				pass
 
 			if blog.stats.hasAtLeastWarning or bVerbose:
 				blog.forwardTo(log)
@@ -190,7 +193,7 @@ class LocalMediaWikisMgr(object):
 
 		wikiInsts = self.__wikiScanner.wikis
 		wikiNames = [ wikiInst.name for wikiInst in wikiInsts ]
-		wikis = [ jk_mediawiki.MediaWikiLocalUserInstallationMgr(wikiInst.instDirPath, self.__userName, log) for wikiInst in wikiInsts ]
+		wikis = [ jk_mediawiki.MediaWikiLocalUserInstallationMgr(wikiInst, self.__userName, log) for wikiInst in wikiInsts ]
 		wikiExtensionInfos = []
 
 		allExtensionNames = set()

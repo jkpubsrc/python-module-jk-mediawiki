@@ -13,6 +13,7 @@ import jk_typing
 import jk_version
 
 from .impl.Utils import Utils
+from .impl.LocalWikiInstInfo import LocalWikiInstInfo
 from .MediaWikiSkinInfo import MediaWikiSkinInfo
 from .MediaWikiDiskUsageInfo import MediaWikiDiskUsageInfo
 from .MediaWikiExtensionInfo import MediaWikiExtensionInfo
@@ -45,6 +46,8 @@ from .impl.WikiPHPProcessFilter import WikiPHPProcessFilter
 #	* A script - here named "mywikicron.sh" - continuously executes the maintenance PHP script.
 #	* A script - here named "mywikicron-bg.sh" - is capable of starting this script as background process (using `nohup`).
 #
+# TODO: Rename this class to MediaWikiLocalUserInstallationMgr as it represents a local user installation of a MediaWiki.
+#
 class MediaWikiLocalUserInstallationMgr(object):
 
 	################################################################################################################################
@@ -68,6 +71,7 @@ class MediaWikiLocalUserInstallationMgr(object):
 	## Constructor
 	################################################################################################################################
 
+	"""
 	#
 	# Configuration parameters:
 	#
@@ -145,6 +149,74 @@ class MediaWikiLocalUserInstallationMgr(object):
 		self.__cronScriptDirPath = os.path.dirname(self.__cronScriptFilePath) if self.__cronScriptFilePath else None
 		self.__cronScriptFileName = os.path.basename(self.__cronScriptFilePath) if self.__cronScriptFilePath else None
 	#
+	"""
+
+	#
+	# Configuration parameters:
+	#
+	# @param	MWManagementCtx ctx							A management context that provides common data.
+	# @param	str mediaWikiInstDirPath					(required) The absolute directory path where the MediaWiki installation can be found.
+	#														The final directory name in the path must be the same as the site name of the Wiki.
+	#														Additionally there must be a cron script named "<sitename>cron.sh".
+	#
+	@jk_typing.checkFunctionSignature(logDescend="Analyzing MediaWiki installation: {mwInstInfo.name}")
+	def __init__(self,
+			ctx:MWManagementCtx,
+			mwInstInfo:LocalWikiInstInfo,
+			log:jk_logging.AbstractLogger,
+		):
+
+		self.__ctx = ctx
+
+		# check MediaWiki installation directory and load settings
+
+		assert mwInstInfo.isValid()
+
+		self.__wikiInstDirPath = mwInstInfo.instRootDirPath
+
+		assert os.path.isdir(self.wikiExtensionsDirPath)
+		assert os.path.isdir(self.wikiImagesDirPath)
+		assert os.path.isdir(self.wikiSkinsDirPath)
+		assert os.path.isfile(self.wikiLocalSettingsFilePath)
+
+		mwLocalSettings = MediaWikiLocalSettingsFile()
+		mwLocalSettings.load(dirPath = mwInstInfo.instRootDirPath)		# TODO: add logging
+
+		#mwLocalSettings.dump()			# DEBUG
+
+		wikiSiteName = mwLocalSettings.getVarValue("wgSitename")
+		if wikiSiteName is None:
+			wikiSiteName = mwLocalSettings.getVarValue("siteName")
+		if wikiSiteName is None:
+			wikiSiteName = mwLocalSettings.getVarValue("wikiSiteName")
+		if wikiSiteName is None:
+			raise Exception("None of these variables exist: $wikiSiteName, $siteName, $wgSitename")
+
+		if wikiSiteName.lower() != mwInstInfo.name.lower():
+			raise Exception("Directory name does not match the MediaWiki site name! ("
+				+ repr(mwInstInfo.name) + " vs. " + repr(wikiSiteName) + ")")
+		self.__wikiSiteName = wikiSiteName
+
+		self.__wikiDBDirPath = mwInstInfo.dbDirPath
+		dbType = mwLocalSettings.getVarValueE("wgDBtype")
+		if dbType == "sqlite":
+			_sqliteDataDir = mwLocalSettings.getVarValueE("wgSQLiteDataDir")
+			if self.__wikiDBDirPath != _sqliteDataDir:
+				raise Exception("Actual database directory does not match the configured database directory! ("
+					+ repr(self.__wikiDBDirPath) + " vs. " + repr(_sqliteDataDir) + ")")
+		else:
+			raise NotImplementedError("Backup of database not (yet) supported: " + dbType)
+
+		self.__wikiBaseDirPath = os.path.dirname(mwInstInfo.instRootDirPath)
+
+		# wiki background task script
+
+		self.__cronScriptFilePath = mwInstInfo.cronShFilePath
+		self.__startCronScriptFilePath = mwInstInfo.cronBgShFilePath
+
+		self.__cronScriptDirPath = os.path.dirname(self.__cronScriptFilePath)
+		self.__cronScriptFileName = os.path.basename(self.__cronScriptFilePath)
+	#
 
 	################################################################################################################################
 	## Public Properties
@@ -192,7 +264,7 @@ class MediaWikiLocalUserInstallationMgr(object):
 
 	@property
 	def wikiDirName(self) -> str:
-		return self.__wikiDirName
+		return self.__wikiSiteName
 	#
 
 	@property
@@ -210,6 +282,8 @@ class MediaWikiLocalUserInstallationMgr(object):
 
 	#
 	# The parent directory of the media wiki installation.
+	#
+	# In recent installations this is the same as cronScriptDirPath.
 	#
 	@property
 	def wikiBaseDirPath(self) -> str:
@@ -231,6 +305,9 @@ class MediaWikiLocalUserInstallationMgr(object):
 		return self.__cronScriptFileName
 	#
 
+	#
+	# In recent installations this is the same as wikiBaseDirPath.
+	#
 	@property
 	def cronScriptDirPath(self) -> str:
 		return self.__cronScriptDirPath

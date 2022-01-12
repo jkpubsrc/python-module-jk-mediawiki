@@ -22,7 +22,7 @@
 		"license": "Apache2",
 		"name": "jk_mediawiki",
 		"packageClass": "python-module",
-		"version": "0.2022.1.12"
+		"version": "0.2022.1.12.1"
 	},
 	"repositories": [
 		{
