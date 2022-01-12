@@ -17,3 +17,11 @@
 	* bugfix: corrected call to cmd_httpstatus()
 	* adapted to match new release of jk_logging
 
+* 2022-01-12
+	* bugfix: corrected reference to moved class
+
+
+
+
+
+
