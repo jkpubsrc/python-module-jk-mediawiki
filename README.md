@@ -8,7 +8,7 @@ This module provides functions, classes and binaries to assist in working with M
 
 Information about this module can be found here:
 
-* [github.org](https://github.com/jkpubsrc/python-module-jk-mediawiki)
+* [github.com](https://github.com/jkpubsrc/python-module-jk-mediawiki)
 * [pypi.python.org](https://pypi.python.org/pypi/jk_mediawiki)
 
 How to use this module
